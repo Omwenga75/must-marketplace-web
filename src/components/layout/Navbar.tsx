@@ -101,8 +101,12 @@ export default function Navbar() {
             href="/"
             className="flex items-center gap-1.5 sm:gap-2.5 font-bold tracking-tight text-slate-900 dark:text-white shrink-0 group"
           >
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary-dark text-primary flex items-center justify-center font-extrabold shadow-sm group-hover:scale-105 transition-transform">
-              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-sm group-hover:scale-105 transition-transform flex items-center justify-center bg-white dark:bg-slate-800 p-0.5 border border-emerald-500/20">
+              <img
+                src="/logo.png"
+                alt="MUST Marketplace"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div className="flex flex-col leading-none">
               <span className="text-sm sm:text-base lg:text-lg font-black tracking-tight flex items-center gap-1">

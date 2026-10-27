@@ -21,8 +21,12 @@ export default function Footer() {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-              <div className="w-9 h-9 rounded-xl bg-primary-dark text-primary flex items-center justify-center font-black">
-                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+              <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-white dark:bg-slate-800 p-0.5 border border-emerald-500/20 shadow-sm">
+                <img
+                  src="/logo.png"
+                  alt="MUST Marketplace"
+                  className="w-full h-full object-contain"
+                />
               </div>
               <span className="text-lg font-black text-slate-900 dark:text-white">
                 MUST <span className="text-secondary font-bold">Marketplace</span>
