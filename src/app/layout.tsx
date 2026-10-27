@@ -61,12 +61,19 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('must_theme');
-                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  if (theme === 'dark' || (!theme && prefersDark)) {
+                  var saved = localStorage.getItem('must_theme');
+                  if (saved === 'dark') {
                     document.documentElement.classList.add('dark');
-                  } else {
+                  } else if (saved === 'light') {
                     document.documentElement.classList.remove('dark');
+                  } else {
+                    // Default behavior: follow phone/system settings (dark if phone is dark, light if phone is light)
+                    var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    if (prefersDark) {
+                      document.documentElement.classList.add('dark');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                    }
                   }
                 } catch (e) {}
               })();

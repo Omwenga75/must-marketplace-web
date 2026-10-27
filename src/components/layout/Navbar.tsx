@@ -41,11 +41,29 @@ export default function Navbar() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
-  // Initialize theme from documentElement class (which was already set by the blocking head script)
+  // Initialize theme from documentElement class and synchronize with system settings
   useEffect(() => {
     setMounted(true);
     const isDark = document.documentElement.classList.contains("dark");
     setIsDarkMode(isDark);
+
+    // If user hasn't explicitly set a preference, dynamically follow phone system theme changes
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const savedTheme = localStorage.getItem("must_theme");
+      if (!savedTheme) {
+        if (e.matches) {
+          document.documentElement.classList.add("dark");
+          setIsDarkMode(true);
+        } else {
+          document.documentElement.classList.remove("dark");
+          setIsDarkMode(false);
+        }
+      }
+    };
+
+    mediaQuery.addEventListener?.("change", handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener?.("change", handleSystemThemeChange);
   }, []);
 
   const toggleTheme = () => {
