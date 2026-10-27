@@ -1,0 +1,21 @@
+[
+  {
+    "id": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2_eqOJbQs272VjoIQ53FWJGHyZkeq1",
+    "participants": [
+      "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "eqOJbQs272VjoIQ53FWJGHyZkeq1"
+    ],
+    "participantNames": {
+      "Gk3z6C39nqYXPegjB2g0S2Wg5yO2": "James Njuguna",
+      "eqOJbQs272VjoIQ53FWJGHyZkeq1": "Mary Wanjiku"
+    },
+    "lastMessage": "okay",
+    "lastMessageTime": "1793111290296",
+    "unreadCounts": {
+      "Gk3z6C39nqYXPegjB2g0S2Wg5yO2": 0,
+      "eqOJbQs272VjoIQ53FWJGHyZkeq1": 0
+    },
+    "productId": "prod-bicycle-1",
+    "productTitle": "Bicycle"
+  }
+]

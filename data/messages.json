@@ -1,0 +1,70 @@
+{
+  "Gk3z6C39nqYXPegjB2g0S2Wg5yO2_eqOJbQs272VjoIQ53FWJGHyZkeq1": [
+    {
+      "id": "msg_initial_1",
+      "senderId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "receiverId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "productId": "prod-bicycle-1",
+      "content": "hi",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793109264268",
+      "isRead": true
+    },
+    {
+      "id": "msg_1793110479619_bnx0",
+      "senderId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "receiverId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "productId": "prod-bicycle-1",
+      "content": "yes",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793110479619",
+      "isRead": true
+    },
+    {
+      "id": "msg_1793110618842_wicd",
+      "senderId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "receiverId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "productId": "prod-bicycle-1",
+      "content": "sawa nakujia",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793110618842",
+      "isRead": true
+    },
+    {
+      "id": "msg_1793110629588_bw4n",
+      "senderId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "receiverId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "productId": "prod-bicycle-1",
+      "content": "wazi mkuu",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793110629588",
+      "isRead": true
+    },
+    {
+      "id": "msg_1793110656992_d8la",
+      "senderId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "receiverId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "productId": "prod-bicycle-1",
+      "content": "😊😊",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793110656992",
+      "isRead": true
+    },
+    {
+      "id": "msg_1793111290296_yu27",
+      "senderId": "eqOJbQs272VjoIQ53FWJGHyZkeq1",
+      "receiverId": "Gk3z6C39nqYXPegjB2g0S2Wg5yO2",
+      "productId": "prod-bicycle-1",
+      "content": "okay",
+      "imageUrl": null,
+      "audioUrl": null,
+      "timestamp": "1793111290296",
+      "isRead": false
+    }
+  ]
+}
