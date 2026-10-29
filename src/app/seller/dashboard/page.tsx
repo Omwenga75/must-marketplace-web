@@ -24,7 +24,7 @@ import { formatPrice, formatRelativeTime } from "@/lib/utils";
 
 export default function SellerDashboardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +45,15 @@ export default function SellerDashboardPage() {
   }, [user]);
 
   if (!user) {
+    if (authLoading) {
+      return (
+        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
+          <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-700 mx-auto" />
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
+          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        </div>
+      );
+    }
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
         <Store className="w-12 h-12 text-secondary mx-auto" />

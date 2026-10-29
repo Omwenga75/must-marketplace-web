@@ -26,7 +26,7 @@ import { database } from "@/lib/firebase/config";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, logout, updateUserProfile } = useAuth();
+  const { user, loading: authLoading, logout, updateUserProfile } = useAuth();
   const { favoriteIds } = useFavorites();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -44,6 +44,15 @@ export default function ProfilePage() {
   }, [user]);
 
   if (!user) {
+    if (authLoading) {
+      return (
+        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
+          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
+          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        </div>
+      );
+    }
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
         <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">

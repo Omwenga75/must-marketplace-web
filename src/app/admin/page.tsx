@@ -27,7 +27,7 @@ import {
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 
 export default function AdminDashboardPage() {
-  const { user, loginAsDemoUser } = useAuth();
+  const { user, loading: authLoading, loginAsDemoUser } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -98,6 +98,15 @@ export default function AdminDashboardPage() {
 
   // Access check
   if (!user || !user.isAdmin) {
+    if (authLoading) {
+      return (
+        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
+          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
+          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        </div>
+      );
+    }
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-5">
         <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-950 text-secondary mx-auto flex items-center justify-center">
