@@ -75,7 +75,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="w-full space-y-12 sm:space-y-16 pb-12">
+    <div className="w-full space-y-8 sm:space-y-16 pb-4 sm:pb-12">
       {/* ── HERO SECTION ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-primary/30 via-primary/10 to-transparent dark:from-emerald-950/40 dark:via-slate-900/50 dark:to-transparent border-b border-slate-200/60 dark:border-slate-800/60 pt-6 pb-12 sm:pt-8 sm:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

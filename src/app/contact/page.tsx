@@ -29,7 +29,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 space-y-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-16 space-y-8 sm:space-y-12">
       {/* Header Banner */}
       <div className="text-center space-y-4 max-w-2xl mx-auto">
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight">

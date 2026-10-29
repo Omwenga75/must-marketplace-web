@@ -15,11 +15,11 @@ export default function Footer() {
   }
 
   return (
-    <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 mt-20 pb-16 sm:pb-8 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-5 sm:gap-x-8 gap-y-8">
+    <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 mt-6 sm:mt-12 lg:mt-16 pb-16 sm:pb-8 transition-colors">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 py-8 sm:py-12">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-x-6 sm:gap-x-8 gap-y-8">
           {/* Brand Info */}
-          <div className="col-span-2 lg:col-span-2 space-y-4">
+          <div className="col-span-2 lg:col-span-2 space-y-3 sm:space-y-4">
             <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight">
               <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-white dark:bg-slate-800 p-0.5 border border-emerald-500/20 shadow-sm">
                 <img
@@ -32,11 +32,11 @@ export default function Footer() {
                 MUST <span className="text-secondary font-bold">Marketplace</span>
               </span>
             </Link>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm">
               The dedicated student-to-student marketplace for Meru University of Science and
               Technology. Buy, sell, and connect safely right on campus.
             </p>
-            <div className="inline-flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-400 bg-primary/80 dark:bg-emerald-950/60 px-3 py-1.5 rounded-full border border-primary-container dark:border-emerald-800 w-fit">
+            <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 bg-primary/80 dark:bg-emerald-950/60 px-3 py-1.5 rounded-full border border-primary-container dark:border-emerald-800 w-fit">
               <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
               <span>Safety Tip: Inspect items before paying.</span>
             </div>
@@ -78,7 +78,7 @@ export default function Footer() {
           </div>
 
           {/* Campus Hubs */}
-          <div className="col-span-1">
+          <div className="col-span-1 justify-self-end lg:justify-self-start">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-3">
               Campus Zones
             </h4>
@@ -97,35 +97,39 @@ export default function Footer() {
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white mb-3">
               Platform
             </h4>
-            <ul className="grid grid-cols-2 lg:grid-cols-1 gap-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-              <li>
-                <Link href="/marketplace" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                  Marketplace
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                  Contact Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/seller/activate" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                  Become a Seller
-                </Link>
-              </li>
-            </ul>
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-x-6 sm:gap-x-8 gap-y-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+              <ul className="space-y-2">
+                <li>
+                  <Link href="/marketplace" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                    Marketplace
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/about" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                    About Us
+                  </Link>
+                </li>
+              </ul>
+              <ul className="space-y-2 justify-self-end lg:justify-self-start">
+                <li>
+                  <Link href="/contact" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                    Contact Us
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/seller/activate" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                    Become a Seller
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
         {/* Bottom Credits */}
-        <div className="border-t border-slate-200 dark:border-slate-800 mt-10 pt-6 flex flex-col items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 gap-2.5">
+        <div className="border-t border-slate-200 dark:border-slate-800 mt-8 sm:mt-10 pt-5 sm:pt-6 flex flex-col items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 gap-2">
           <p>© {new Date().getFullYear()} MUST Marketplace. Meru University of Science & Technology.</p>
-          <p className="text-xs text-slate-400 dark:text-slate-400 font-medium tracking-wide">
+          <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-400 font-medium tracking-wide">
             Powered By Programmer - Software Engineer
           </p>
         </div>

@@ -453,7 +453,7 @@ export default function NotificationsPage() {
     // so a logged-in user never sees the "Sign In Required" flash on page refresh.
     if (authLoading) {
       return (
-        <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10 pt-4 pb-6 lg:py-8">
           <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
             <aside className="hidden md:block w-60 lg:w-64 shrink-0 space-y-3 animate-pulse">
               <div className="flex items-center gap-3 px-1 mb-6">
@@ -497,7 +497,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-10 pt-4 pb-6 lg:py-8">
       <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
         {/* ── LEFT SIDEBAR (Desktop only) ─────────────────────────────────── */}
         <aside className="hidden md:block w-60 lg:w-64 shrink-0 md:sticky md:top-24 self-start">
