@@ -297,7 +297,7 @@ function MessagesContent() {
   );
 
   return (
-    <div className="w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex">
+    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex">
       {/* ── LEFT SIDEBAR: Direct Conversations ───────────────────────────────── */}
       <aside
         className={`w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900 ${
@@ -324,7 +324,7 @@ function MessagesContent() {
         </div>
 
         {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto flex flex-col">
           {!conversationsLoaded ? (
             /* Shimmer Skeletons (matching mobile app ConversationItemSkeleton) */
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -333,13 +333,17 @@ function MessagesContent() {
               ))}
             </div>
           ) : filteredConversations.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 space-y-2">
-              <MessageSquare className="w-10 h-10 mx-auto opacity-30 text-slate-400" />
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                No conversations yet
+            <div className="flex-1 flex flex-col items-center justify-center md:justify-start p-6 md:p-8 md:pt-12 text-center text-slate-400 space-y-3 md:space-y-2">
+              <div className="w-16 h-16 md:w-12 md:h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-1">
+                <MessageSquare className="w-8 h-8 md:w-6 md:h-6 opacity-40 text-slate-400" />
+              </div>
+              <p className="text-sm md:text-xs font-bold md:font-semibold text-slate-700 dark:text-slate-300">
+                {searchFilter ? "No conversations found" : "No conversations yet"}
               </p>
-              <p className="text-[11px] text-slate-400">
-                Start chatting with sellers directly from any product page.
+              <p className="text-xs md:text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                {searchFilter
+                  ? `No chats match "${searchFilter}". Try another name or keyword.`
+                  : "Start chatting with sellers directly from any product page."}
               </p>
             </div>
           ) : (
