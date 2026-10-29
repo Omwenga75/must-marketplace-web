@@ -68,7 +68,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-7.5rem)] sm:min-h-0 flex flex-col justify-center items-center px-4 py-4 sm:pt-6 sm:pb-12">
+    <div className="min-h-[calc(100dvh_-_7.5rem)] sm:min-h-0 flex flex-col justify-center items-center px-4 py-4 sm:pt-6 sm:pb-12">
       <div className="w-full max-w-md space-y-4">
         <p className="text-center text-sm font-medium text-slate-600 dark:text-slate-400">
           Join students and sellers trading safely on campus

@@ -48,8 +48,12 @@ export default function Navbar() {
     setIsDarkMode(isDark);
 
     // If user hasn't explicitly set a preference, dynamically follow phone system theme changes
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+    const mediaQuery =
+      typeof window !== "undefined" && window.matchMedia
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+
+    const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
       const savedTheme = localStorage.getItem("must_theme");
       if (!savedTheme) {
         if (e.matches) {
@@ -62,8 +66,23 @@ export default function Navbar() {
       }
     };
 
-    mediaQuery.addEventListener?.("change", handleSystemThemeChange);
-    return () => mediaQuery.removeEventListener?.("change", handleSystemThemeChange);
+    if (mediaQuery) {
+      if (typeof mediaQuery.addEventListener === "function") {
+        mediaQuery.addEventListener("change", handleSystemThemeChange);
+      } else if (typeof (mediaQuery as any).addListener === "function") {
+        (mediaQuery as any).addListener(handleSystemThemeChange);
+      }
+    }
+
+    return () => {
+      if (mediaQuery) {
+        if (typeof mediaQuery.removeEventListener === "function") {
+          mediaQuery.removeEventListener("change", handleSystemThemeChange);
+        } else if (typeof (mediaQuery as any).removeListener === "function") {
+          (mediaQuery as any).removeListener(handleSystemThemeChange);
+        }
+      }
+    };
   }, []);
 
   const toggleTheme = () => {
@@ -526,7 +545,7 @@ export default function Navbar() {
         <Link
           href="/marketplace"
           className={`flex flex-col items-center gap-0.5 p-1 ${
-            pathname.startsWith("/marketplace")
+            pathname?.startsWith("/marketplace")
               ? "text-emerald-600 dark:text-emerald-400 font-bold"
               : ""
           }`}
@@ -537,7 +556,9 @@ export default function Navbar() {
 
         <Link
           href={
-            user?.isSeller
+            !mounted
+              ? "/register?role=seller"
+              : user?.isSeller
               ? "/seller/products/new"
               : user
               ? "/seller/activate"
@@ -556,7 +577,7 @@ export default function Navbar() {
         <Link
           href="/messages"
           className={`flex flex-col items-center gap-0.5 p-1 relative ${
-            pathname.startsWith("/messages")
+            pathname?.startsWith("/messages")
               ? "text-emerald-600 dark:text-emerald-400 font-bold"
               : ""
           }`}
@@ -571,13 +592,13 @@ export default function Navbar() {
         </Link>
 
         <Link
-          href={user ? "/profile" : "/login"}
+          href={!mounted ? "/login" : user ? "/profile" : "/login"}
           className={`flex flex-col items-center gap-0.5 p-1 ${
             pathname === "/profile" ? "text-emerald-600 dark:text-emerald-400 font-bold" : ""
           }`}
         >
           <User className="w-5 h-5" />
-          <span>{!mounted ? "" : user ? "Profile" : "Sign In"}</span>
+          <span>{!mounted ? "Sign In" : user ? "Profile" : "Sign In"}</span>
         </Link>
       </nav>
     </>

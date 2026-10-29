@@ -10,7 +10,7 @@ export default function Footer() {
   const pathname = usePathname();
 
   // Hide footer on chat & messaging screens for an app-like viewport experience
-  if (pathname === "/messages" || pathname.startsWith("/messages/")) {
+  if (pathname === "/messages" || pathname?.startsWith("/messages/")) {
     return null;
   }
 

@@ -272,9 +272,9 @@ function EmptyState({ filter }: { filter: FilterKey }) {
       sub: "No notifications from this week.",
     },
   };
-  const m = msgs[filter];
+  const m = msgs[filter] || msgs.all;
   return (
-    <div className="w-full min-h-[calc(100dvh-14rem)] sm:min-h-0 flex flex-col items-center justify-center text-center space-y-4 px-4 sm:px-6 py-8 sm:py-20 mx-auto">
+    <div className="w-full min-h-[calc(100dvh_-_14rem)] sm:min-h-0 flex flex-col items-center justify-center text-center space-y-4 px-4 sm:px-6 py-8 sm:py-20 mx-auto">
       <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 mx-auto">
         {m.icon}
       </div>
@@ -478,7 +478,7 @@ export default function NotificationsPage() {
     }
 
     return (
-      <div className="max-w-md mx-auto px-4 py-8 sm:py-24 min-h-[calc(100dvh-10rem)] sm:min-h-0 flex flex-col justify-center items-center text-center space-y-5">
+      <div className="max-w-md mx-auto px-4 py-8 sm:py-24 min-h-[calc(100dvh_-_10rem)] sm:min-h-0 flex flex-col justify-center items-center text-center space-y-5">
         <div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mx-auto">
           <Bell className="w-9 h-9 text-secondary" />
         </div>

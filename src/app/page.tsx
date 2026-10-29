@@ -24,7 +24,7 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 import { Product } from "@/types";
-import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
+import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS, CATEGORY_FALLBACK_IMAGES } from "@/lib/constants";
 import { fetchProducts } from "@/lib/firebase/services";
 import ProductCard from "@/components/products/ProductCard";
 import ProductGrid from "@/components/products/ProductGrid";
@@ -162,32 +162,41 @@ export default function HomePage() {
 
                 {/* Preview Mini Carousel / Product Sample */}
                 <div className="mt-4 space-y-3">
-                  {products.slice(0, 3).map((item) => (
-                    <Link
-                      key={item.id}
-                      href={`/product/${item.id}`}
-                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                    >
-                      <img
-                        src={item.imageUrls[0]}
-                        alt={item.title}
-                        className="w-14 h-14 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                          {item.title}
-                        </p>
-                        <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                          KSh {item.price.toLocaleString()}
-                        </p>
-                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                          <MapPin className="w-2.5 h-2.5 text-secondary" />
-                          <span>{item.location}</span>
-                        </p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-                    </Link>
-                  ))}
+                  {products.slice(0, 3).map((item) => {
+                    const fallbackImg =
+                      CATEGORY_FALLBACK_IMAGES[item.category?.id || "1"] ||
+                      "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800";
+                    const displayImg =
+                      item.imageUrls && item.imageUrls.length > 0 && item.imageUrls[0]
+                        ? item.imageUrls[0]
+                        : fallbackImg;
+                    return (
+                      <Link
+                        key={item.id}
+                        href={`/product/${item.id}`}
+                        className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                      >
+                        <img
+                          src={displayImg}
+                          alt={item.title || "Product"}
+                          className="w-14 h-14 rounded-lg object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {item.title || "Campus Item"}
+                          </p>
+                          <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                            KSh {Number(item.price || 0).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <MapPin className="w-2.5 h-2.5 text-secondary" />
+                            <span>{item.location || "Campus"}</span>
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                      </Link>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -230,16 +239,16 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 sm:gap-4">
+        <div className="flex items-stretch gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 scrollbar-none no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {SAMPLE_CATEGORIES.map((cat) => {
             const iconConfig = categoryIcons[cat.id] || { icon: Package, gradient: "from-slate-500 to-slate-600" };
-            const IconComponent = iconConfig.icon;
+            const IconComponent = iconConfig?.icon || Package;
             const count = getCategoryCount(cat.id);
             return (
               <Link
                 key={cat.id}
                 href={`/marketplace?category=${cat.id}`}
-                className="group flex flex-col items-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center"
+                className="group shrink-0 w-[115px] sm:w-[130px] md:w-[140px] flex flex-col items-center p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center"
               >
                 <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br ${iconConfig.gradient} flex items-center justify-center group-hover:scale-110 group-hover:shadow-md transition-all duration-200 mb-2`}>
                   <IconComponent className="w-5 h-5 text-white" />
