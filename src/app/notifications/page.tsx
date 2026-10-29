@@ -22,6 +22,8 @@ import {
   CalendarClock,
   CircleDot,
   Filter,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { AppNotification } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -344,6 +346,30 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Prevent background scrolling when mobile drawer is open
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [drawerOpen]);
+
+  // Close drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && drawerOpen) {
+        setDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -429,7 +455,7 @@ export default function NotificationsPage() {
       return (
         <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
           <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
-            <aside className="w-full md:w-60 lg:w-64 shrink-0 space-y-3 animate-pulse">
+            <aside className="hidden md:block w-60 lg:w-64 shrink-0 space-y-3 animate-pulse">
               <div className="flex items-center gap-3 px-1 mb-6">
                 <div className="w-10 h-10 rounded-2xl bg-slate-200 dark:bg-slate-700" />
                 <div className="space-y-2 flex-1">
@@ -473,8 +499,8 @@ export default function NotificationsPage() {
   return (
     <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
       <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
-        {/* ── LEFT SIDEBAR ──────────────────────────────────────────────────── */}
-        <aside className="w-full md:w-60 lg:w-64 shrink-0 md:sticky md:top-24 self-start">
+        {/* ── LEFT SIDEBAR (Desktop only) ─────────────────────────────────── */}
+        <aside className="hidden md:block w-60 lg:w-64 shrink-0 md:sticky md:top-24 self-start">
           {/* Top Title Card */}
           <div className="flex items-center gap-3 px-1 mb-6">
             <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-secondary/20 flex items-center justify-center shrink-0">
@@ -573,6 +599,49 @@ export default function NotificationsPage() {
 
         {/* ── RIGHT: Notification Cards ─────────────────────────────────────── */}
         <main className="w-full flex-1 min-w-0 space-y-4">
+          {/* ── MOBILE TOP BAR (Phone only: Shows right at the top) ────────── */}
+          <div className="flex md:hidden items-center justify-between gap-2.5 p-2.5 sm:p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>Filters</span>
+              <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded-full text-[10px] font-black leading-none">
+                {activeFilter === "all"
+                  ? `All (${notifications.length})`
+                  : activeFilter === "unread"
+                  ? `Unread (${unreadCount})`
+                  : activeFilter === "read"
+                  ? `Read (${readCount})`
+                  : activeFilter === "today"
+                  ? `Today (${todayCount})`
+                  : `Week (${thisWeekCount})`}
+              </span>
+            </button>
+
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Mark read</span>
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  title="Clear all notifications"
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Cards List */}
           {loading ? (
             <div className="space-y-3">
@@ -612,6 +681,145 @@ export default function NotificationsPage() {
           )}
         </main>
       </div>
+
+      {/* ── MOBILE LEFT DRAWER ──────────────────────────────────────────────── */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Drawer Panel Sliding in from Left */}
+          <div className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col p-5 overflow-y-auto z-10 border-r border-slate-200 dark:border-slate-800 animate-in slide-in-from-left duration-200">
+            {/* Header: Title + Unread + Close Button */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-secondary/10 dark:bg-secondary/20 flex items-center justify-center shrink-0">
+                  <Bell className="w-5 h-5 text-secondary" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                    Notifications
+                  </h2>
+                  {unreadCount > 0 ? (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      {unreadCount} new
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 mt-0.5">All caught up</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Close drawer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter Navigation */}
+            <nav className="space-y-1 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3.5 mb-2">
+                Filters
+              </p>
+
+              <SideItem
+                label="All"
+                icon={<Inbox className="w-4 h-4" />}
+                count={notifications.length}
+                active={activeFilter === "all"}
+                onClick={() => {
+                  setActiveFilter("all");
+                  setDrawerOpen(false);
+                }}
+              />
+              <SideItem
+                label="Unread"
+                icon={<CircleDot className="w-4 h-4" />}
+                count={unreadCount}
+                active={activeFilter === "unread"}
+                onClick={() => {
+                  setActiveFilter("unread");
+                  setDrawerOpen(false);
+                }}
+              />
+              <SideItem
+                label="Read"
+                icon={<CheckCheck className="w-4 h-4" />}
+                count={readCount}
+                active={activeFilter === "read"}
+                onClick={() => {
+                  setActiveFilter("read");
+                  setDrawerOpen(false);
+                }}
+              />
+
+              <div className="my-3.5 h-px bg-slate-200 dark:bg-slate-800 mx-2" />
+
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3.5 mb-2">
+                By Time
+              </p>
+
+              <SideItem
+                label="Today"
+                icon={<CalendarDays className="w-4 h-4" />}
+                count={todayCount}
+                active={activeFilter === "today"}
+                onClick={() => {
+                  setActiveFilter("today");
+                  setDrawerOpen(false);
+                }}
+              />
+              <SideItem
+                label="This Week"
+                icon={<CalendarClock className="w-4 h-4" />}
+                count={thisWeekCount}
+                active={activeFilter === "this_week"}
+                onClick={() => {
+                  setActiveFilter("this_week");
+                  setDrawerOpen(false);
+                }}
+              />
+            </nav>
+
+            {/* Actions */}
+            {notifications.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3.5 mb-2">
+                  Actions
+                </p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => {
+                      handleMarkAllRead();
+                      setDrawerOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors text-left"
+                  >
+                    <Check className="w-4 h-4" />
+                    Mark all as read
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    handleClearAll();
+                    setDrawerOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-left"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
