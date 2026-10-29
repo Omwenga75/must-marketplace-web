@@ -269,21 +269,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, pass: string) => {
     sessionStorage.removeItem("must_explicit_logout");
     localStorage.removeItem("must_demo_session");
-
-    // If there's a *different* user currently cached, purge their per-user
-    // data so the incoming user never sees stale notifications / conversations.
-    const previousUid = localStorage.getItem("must_active_uid");
     if (!auth) throw new Error("Firebase Auth not initialized");
     const cred = await signInWithEmailAndPassword(auth, email, pass);
-    if (previousUid && previousUid !== cred.user.uid) {
-      try {
-        localStorage.removeItem(`must_notifications_${previousUid}`);
-        localStorage.removeItem(`must_conversations_${previousUid}`);
-        // Keep must_user_${previousUid} so profile can still be resolved for
-        // message threads, but purge active session markers.
-      } catch {}
-    }
-
     localStorage.setItem("must_active_uid", cred.user.uid);
     await fetchUserProfile(cred.user.uid, cred.user.email || "");
   };
@@ -445,18 +432,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     sessionStorage.setItem("must_explicit_logout", "true");
 
-    // Purge all session-specific data for the current user so the next
-    // account that logs in starts with a completely clean slate.
-    if (user?.id) {
-      const uid = user.id;
-      try {
-        localStorage.removeItem(`must_notifications_${uid}`);
-        localStorage.removeItem(`must_conversations_${uid}`);
-        localStorage.removeItem(`must_user_${uid}`);
-      } catch {}
-    }
-
-    // Purge shared session keys
+    // Only clear the shared session pointers — keep per-user scoped data
+    // (must_notifications_${uid}, must_conversations_${uid}) intact so the
+    // same user gets their data back immediately on next login.
     localStorage.removeItem("must_demo_session");
     localStorage.removeItem("must_active_user");
     localStorage.removeItem("must_active_uid");
