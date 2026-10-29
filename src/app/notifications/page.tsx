@@ -31,7 +31,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   clearAllNotifications,
-  createNotification,
+  deleteNotification,
 } from "@/lib/firebase/services";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -149,9 +149,11 @@ function SkeletonCard() {
 function NotificationCard({
   notif,
   onMarkRead,
+  onDelete,
 }: {
   notif: AppNotification;
   onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const cfg = getConfig(notif.type);
   const isRead = notif.isRead;
@@ -191,10 +193,22 @@ function NotificationCard({
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
             )}
           </div>
-          <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 shrink-0 whitespace-nowrap mt-0.5">
-            <Clock className="w-3 h-3" />
-            {formatRelativeTime(notif.timestamp)}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap mt-0.5">
+              <Clock className="w-3 h-3" />
+              {formatRelativeTime(notif.timestamp)}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(notif.id);
+              }}
+              title="Delete notification"
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <p
@@ -351,30 +365,6 @@ export default function NotificationsPage() {
     return () => unsub();
   }, [user?.id]);
 
-  // Recovery: if a real user still has 0 notifications after Firebase responds
-  // (e.g. data was wiped by a previous bug), seed them a welcome notification.
-  useEffect(() => {
-    if (!user?.id || user.id.startsWith("demo_")) return;
-    if (loading) return;
-    if (notifications.length > 0) return;
-
-    const timer = setTimeout(() => {
-      // Double-check local storage is still empty before writing
-      const current = getLocalNotifications(user.id);
-      if (current.length === 0) {
-        createNotification(user.id, {
-          title: `Welcome to MUST Marketplace! 🎉`,
-          message:
-            "Buy & sell affordable electronics, books, furniture & campus essentials safely with fellow students across Main Gate, Nchiru & California.",
-          type: "welcome",
-          priority: "NORMAL",
-        }).catch(() => {});
-      }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [user?.id, loading, notifications.length]);
-
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const readCount = notifications.filter((n) => n.isRead).length;
   const todayCount = notifications.filter((n) => getGroup(n.timestamp) === "today").length;
@@ -422,6 +412,10 @@ export default function NotificationsPage() {
   const handleMarkAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     if (user) markAllNotificationsAsRead(user.id).catch(() => {});
+  };
+  const handleDeleteOne = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (user?.id) deleteNotification(user.id, id).catch(() => {});
   };
   const handleClearAll = () => {
     setNotifications([]);
@@ -594,7 +588,12 @@ export default function NotificationsPage() {
                 <div key={label} className="space-y-2.5">
                   <GroupLabel label={label} />
                   {items.map((n) => (
-                    <NotificationCard key={n.id} notif={n} onMarkRead={handleMarkOne} />
+                    <NotificationCard
+                      key={n.id}
+                      notif={n}
+                      onMarkRead={handleMarkOne}
+                      onDelete={handleDeleteOne}
+                    />
                   ))}
                 </div>
               ))}
@@ -602,7 +601,12 @@ export default function NotificationsPage() {
           ) : (
             <div className="space-y-2.5">
               {filtered.map((n) => (
-                <NotificationCard key={n.id} notif={n} onMarkRead={handleMarkOne} />
+                <NotificationCard
+                  key={n.id}
+                  notif={n}
+                  onMarkRead={handleMarkOne}
+                  onDelete={handleDeleteOne}
+                />
               ))}
             </div>
           )}

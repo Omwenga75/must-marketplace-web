@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
-import { subscribeToConversations, subscribeToNotifications, getLocalNotifications, createNotification } from "@/lib/firebase/services";
+import { subscribeToConversations, subscribeToNotifications } from "@/lib/firebase/services";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -96,27 +96,9 @@ export default function Navbar() {
       setUnreadNotifs(unreadCount);
     });
 
-    // Recovery: if a real user has no notifications after Firebase settles,
-    // create a welcome notification so they never see a permanently empty inbox.
-    const recoveryTimer = !user.id.startsWith("demo_")
-      ? setTimeout(() => {
-          const current = getLocalNotifications(user.id);
-          if (current.length === 0) {
-            createNotification(user.id, {
-              title: "Welcome to MUST Marketplace! 🎉",
-              message:
-                "Buy & sell affordable electronics, books, furniture & campus essentials safely with fellow students across Main Gate, Nchiru & California.",
-              type: "welcome",
-              priority: "NORMAL",
-            }).catch(() => {});
-          }
-        }, 3000)
-      : null;
-
     return () => {
       unsubConvs();
       unsubNotifs();
-      if (recoveryTimer) clearTimeout(recoveryTimer);
     };
   }, [user?.id]);
 

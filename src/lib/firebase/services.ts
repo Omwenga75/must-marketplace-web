@@ -1656,8 +1656,14 @@ export function subscribeToNotifications(
       saveLocalNotifications(userId, list);
       callback(list);
     } else {
-      // If remote is empty, use whatever local user has (e.g. welcome message)
-      callback(getLocalNotifications(userId));
+      if (!userId.startsWith("demo_")) {
+        // Real user has no notifications in DB -> sync local to empty as well
+        saveLocalNotifications(userId, []);
+        callback([]);
+      } else {
+        // Demo account uses localStorage
+        callback(getLocalNotifications(userId));
+      }
     }
   });
 
@@ -1715,6 +1721,27 @@ export async function markAllNotificationsAsRead(userId: string) {
       }
     } catch (err) {
       console.warn(err);
+    }
+  }
+}
+
+export async function deleteNotification(userId: string, notificationId: string) {
+  if (!userId || !notificationId) return;
+
+  // 1. Delete locally
+  if (typeof window !== "undefined") {
+    const list = getLocalNotifications(userId);
+    const updated = list.filter((n) => n.id !== notificationId);
+    saveLocalNotifications(userId, updated);
+    notifyChatSync({ type: "notification_change", userId });
+  }
+
+  // 2. Delete in Firebase
+  if (database) {
+    try {
+      await remove(ref(database, `notifications/${userId}/${notificationId}`));
+    } catch (err) {
+      console.warn("Failed to delete notification in DB:", err);
     }
   }
 }
