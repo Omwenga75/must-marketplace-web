@@ -297,15 +297,15 @@ export default function ProfilePage() {
       </div>
 
       {/* Logout button */}
-      <div className="pt-4 flex justify-end">
+      <div className="pt-6 sm:pt-8 flex justify-center items-center w-full">
         <button
           onClick={() => {
             logout();
             router.push("/");
           }}
-          className="px-5 py-2.5 rounded-xl border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 text-xs font-bold flex items-center gap-2 transition-colors"
+          className="w-full max-w-xs sm:max-w-sm py-3 px-6 rounded-2xl border border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all shadow-xs hover:shadow-sm active:scale-98"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
           <span>Log Out of Account</span>
         </button>
       </div>
