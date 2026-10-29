@@ -258,13 +258,13 @@ function EmptyState({ filter }: { filter: FilterKey }) {
   };
   const m = msgs[filter];
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 px-6">
-      <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+    <div className="w-full flex flex-col items-center justify-center py-16 sm:py-20 text-center space-y-4 px-4 sm:px-6 mx-auto">
+      <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 mx-auto">
         {m.icon}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-1 max-w-sm flex flex-col items-center text-center mx-auto">
         <h3 className="text-base font-black text-slate-900 dark:text-white">{m.title}</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">{m.sub}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{m.sub}</p>
       </div>
     </div>
   );
@@ -434,7 +434,7 @@ export default function NotificationsPage() {
     if (authLoading) {
       return (
         <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-          <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start">
+          <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
             <aside className="w-full md:w-60 lg:w-64 shrink-0 space-y-3 animate-pulse">
               <div className="flex items-center gap-3 px-1 mb-6">
                 <div className="w-10 h-10 rounded-2xl bg-slate-200 dark:bg-slate-700" />
@@ -447,7 +447,7 @@ export default function NotificationsPage() {
                 <div key={i} className="h-10 bg-slate-100 dark:bg-slate-800 rounded-xl" />
               ))}
             </aside>
-            <main className="flex-1 min-w-0 space-y-3">
+            <main className="w-full flex-1 min-w-0 space-y-3">
               {[...Array(4)].map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
@@ -478,7 +478,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
-      <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-start">
+      <div className="flex flex-col md:flex-row gap-8 lg:gap-12 items-stretch md:items-start">
         {/* ── LEFT SIDEBAR ──────────────────────────────────────────────────── */}
         <aside className="w-full md:w-60 lg:w-64 shrink-0 md:sticky md:top-24 self-start">
           {/* Top Title Card */}
@@ -578,7 +578,7 @@ export default function NotificationsPage() {
         </aside>
 
         {/* ── RIGHT: Notification Cards ─────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 space-y-4">
+        <main className="w-full flex-1 min-w-0 space-y-4">
           {/* Cards List */}
           {loading ? (
             <div className="space-y-3">
