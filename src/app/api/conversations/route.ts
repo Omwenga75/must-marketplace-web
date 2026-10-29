@@ -45,11 +45,13 @@ function saveConversationsFile(threads: StoredThread[]): void {
 }
 
 function matchesUser(targetId: string, thread: StoredThread): boolean {
+  if (!targetId) return false;
   const canon = resolveCanonicalId(targetId);
   const rawLower = targetId.toLowerCase().trim();
 
+  // A thread only belongs to this user if targetId or its canonical legacy ID is explicitly a participant
   for (const p of thread.participants) {
-    if (p === targetId || p === canon || resolveCanonicalId(p) === canon) return true;
+    if (p === targetId || p === canon) return true;
   }
   if (thread.aliases) {
     for (const a of thread.aliases) {

@@ -69,8 +69,8 @@ export async function GET(req: Request) {
 
   if (emailParam || idParam) {
     const user = users.find((u) => {
-      if (emailParam && u.email && u.email.toLowerCase().trim() === emailParam) return true;
-      if (idParam && u.id === idParam) return true;
+      if (idParam) return u.id === idParam;
+      if (emailParam) return u.email && u.email.toLowerCase().trim() === emailParam;
       return false;
     });
 
@@ -123,8 +123,8 @@ export async function POST(req: Request) {
     const products = getStoredProducts();
 
     const existingIndex = users.findIndex((u) => {
-      if (id && u.id === id) return true;
-      if (emailLower && u.email && u.email.toLowerCase().trim() === emailLower) return true;
+      if (id) return u.id === id;
+      if (emailLower && u.email) return u.email.toLowerCase().trim() === emailLower;
       return false;
     });
 
@@ -197,8 +197,8 @@ export async function PATCH(req: Request) {
     const products = getStoredProducts();
 
     const existingIndex = users.findIndex((u) => {
-      if (id && u.id === id) return true;
-      if (emailLower && u.email && u.email.toLowerCase().trim() === emailLower) return true;
+      if (id) return u.id === id;
+      if (emailLower && u.email) return u.email.toLowerCase().trim() === emailLower;
       return false;
     });
 

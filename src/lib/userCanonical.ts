@@ -2,28 +2,18 @@
  * Canonical user-ID resolution for cross-browser message routing.
  * Maps known aliases / legacy IDs to their real Firebase Auth UID.
  */
-export function resolveCanonicalId(rawId: string, name?: string): string {
+export function resolveCanonicalId(rawId: string, _name?: string): string {
   if (!rawId) return rawId;
   const lower = rawId.toLowerCase().trim();
-  const lowerName = (name || "").toLowerCase().trim();
 
-  if (
-    lower === "u_mary_wanjiku" ||
-    lower === "test_mary_uid_123" ||
-    lowerName === "mary wanjiku" ||
-    lower.includes("omwengajane")
-  ) {
+  // Strictly map only exact legacy mock IDs — never alias real user accounts, names, or emails
+  if (lower === "u_mary_wanjiku" || lower === "test_mary_uid_123") {
     return "eqOJbQs272VjoIQ53FWJGHyZkeq1";
   }
-  if (lower === "u1" || lowerName === "james mutua" || lowerName === "james mutua (seller)") {
+  if (lower === "u1") {
     return "demo_seller_456";
   }
-  if (
-    lower === "system_admin" ||
-    lowerName.includes("support desk") ||
-    lowerName.includes("must admin") ||
-    lower === "demo_admin_789"
-  ) {
+  if (lower === "system_admin") {
     return "demo_admin_789";
   }
   return rawId;

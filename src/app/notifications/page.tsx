@@ -27,87 +27,12 @@ import { AppNotification } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import {
   subscribeToNotifications,
+  getLocalNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  clearAllNotifications,
 } from "@/lib/firebase/services";
 import { formatRelativeTime } from "@/lib/utils";
-
-// ─── Demo Notifications ───────────────────────────────────────────────────────
-function getDemoNotifications(user?: { fullName?: string } | null): AppNotification[] {
-  const name = user?.fullName?.split(" ")[0] || "Comrade";
-  return [
-    {
-      id: "demo_welcome",
-      title: `Welcome to MUST Marketplace, ${name}!`,
-      message:
-        "Buy & sell affordable electronics, books, furniture & more with fellow students across Main Gate, Nchiru, California & beyond. You're all set!",
-      timestamp: Date.now() - 5 * 60 * 1000,
-      isRead: false,
-      type: "welcome",
-      priority: "NORMAL",
-    },
-    {
-      id: "demo_new_listing",
-      title: "New Listing Near You",
-      message:
-        "A student near Nchiru just listed an HP Laptop i5 (8GB RAM) for KSh 28,000. Check it out before it's gone!",
-      timestamp: Date.now() - 35 * 60 * 1000,
-      isRead: false,
-      type: "listing",
-      priority: "NORMAL",
-    },
-    {
-      id: "demo_message",
-      title: "New Message from James Mutua",
-      message:
-        "\"Hey! Is the Samsung A54 still available? Can we meet at the Library today at 4pm?\"",
-      timestamp: Date.now() - 2 * 3600 * 1000,
-      isRead: false,
-      type: "message",
-      priority: "NORMAL",
-    },
-    {
-      id: "demo_saved",
-      title: "Price Drop on a Saved Item",
-      message:
-        "Great news — the seller dropped \"Casio FX-991EX Classwiz\" from KSh 2,500 to KSh 2,100. Grab it now!",
-      timestamp: Date.now() - 4 * 3600 * 1000,
-      isRead: false,
-      type: "price",
-      priority: "NORMAL",
-    },
-    {
-      id: "demo_safety",
-      title: "Campus Safety Reminder",
-      message:
-        "Always meet at busy campus zones — Library Foyer, Student Center, or Gate A. Inspect all items before M-Pesa payments.",
-      timestamp: Date.now() - 24 * 3600 * 1000,
-      isRead: true,
-      type: "security",
-      priority: "INFO",
-    },
-    {
-      id: "demo_tip",
-      title: "Tip: Post Your First Listing",
-      message:
-        "Got items collecting dust? Turn them into quick cash! Tap the + button to create a listing in under 2 minutes.",
-      timestamp: Date.now() - 2 * 24 * 3600 * 1000,
-      isRead: true,
-      type: "tip",
-      priority: "INFO",
-    },
-    {
-      id: "demo_promo",
-      title: "MUST Marketplace Now Has 120+ Items",
-      message:
-        "Electronics, textbooks, furniture & fashion — all from verified student sellers. Browse what's trending today.",
-      timestamp: Date.now() - 3 * 24 * 3600 * 1000,
-      isRead: true,
-      type: "system",
-      priority: "INFO",
-    },
-  ];
-}
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 const TYPE_CONFIG: Record<
@@ -406,17 +331,24 @@ export default function NotificationsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
 
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
+      setNotifications([]);
       setLoading(false);
       return;
     }
-    setNotifications(getDemoNotifications(user));
+
+    setLoading(true);
+    const initial = getLocalNotifications(user.id);
+    setNotifications(initial);
     setLoading(false);
+
     const unsub = subscribeToNotifications(user.id, (list) => {
-      if (list.length > 0) setNotifications(list);
+      setNotifications(list);
+      setLoading(false);
     });
+
     return () => unsub();
-  }, [user]);
+  }, [user?.id]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const readCount = notifications.filter((n) => n.isRead).length;
@@ -466,7 +398,10 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     if (user) markAllNotificationsAsRead(user.id).catch(() => {});
   };
-  const handleClearAll = () => setNotifications([]);
+  const handleClearAll = () => {
+    setNotifications([]);
+    if (user?.id) clearAllNotifications(user.id).catch(() => {});
+  };
 
   if (!user) {
     return (

@@ -1517,23 +1517,106 @@ export function likeChatroomMessage(messageId: string, topic: ChatroomTopic, use
 // NOTIFICATIONS SERVICES
 // ─────────────────────────────────────────────────────────────
 
+export function getDemoNotifications(name: string = "Comrade"): AppNotification[] {
+  return [
+    {
+      id: "demo_welcome",
+      title: `Welcome to MUST Marketplace, ${name}! 🎉`,
+      message:
+        "Buy & sell affordable electronics, books, furniture & campus essentials with fellow students across Main Gate, Nchiru & California.",
+      timestamp: Date.now() - 5 * 60 * 1000,
+      isRead: false,
+      type: "welcome",
+      priority: "NORMAL",
+    },
+    {
+      id: "demo_safety",
+      title: "Campus Safety Reminder",
+      message:
+        "Always meet at busy campus zones — Library Foyer, Student Center, or Gate A. Inspect all items before M-Pesa payments.",
+      timestamp: Date.now() - 24 * 3600 * 1000,
+      isRead: true,
+      type: "security",
+      priority: "INFO",
+    },
+    {
+      id: "demo_tip",
+      title: "Tip: Post Your First Listing",
+      message:
+        "Got items collecting dust? Turn them into quick cash! Tap the + button to create a listing in under 2 minutes.",
+      timestamp: Date.now() - 2 * 24 * 3600 * 1000,
+      isRead: true,
+      type: "tip",
+      priority: "INFO",
+    },
+    {
+      id: "demo_promo",
+      title: "MUST Marketplace Community",
+      message:
+        "Electronics, textbooks, furniture & fashion — all from verified student sellers. Browse what's trending today.",
+      timestamp: Date.now() - 3 * 24 * 3600 * 1000,
+      isRead: true,
+      type: "system",
+      priority: "INFO",
+    },
+  ];
+}
+
+export function getLocalNotifications(userId: string): AppNotification[] {
+  if (typeof window === "undefined" || !userId) return [];
+  try {
+    const raw = localStorage.getItem(`must_notifications_${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+
+  // For demo accounts only, initialize with clean demo notifications
+  if (userId.startsWith("demo_")) {
+    const demos = getDemoNotifications();
+    saveLocalNotifications(userId, demos);
+    return demos;
+  }
+
+  return [];
+}
+
+export function saveLocalNotifications(userId: string, notifications: AppNotification[]) {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    localStorage.setItem(`must_notifications_${userId}`, JSON.stringify(notifications));
+  } catch {}
+}
+
 export async function createNotification(
   userId: string,
   data: Omit<AppNotification, "id" | "timestamp" | "isRead">
 ) {
-  if (!database) return;
-  try {
-    const notifRef = push(ref(database, `notifications/${userId}`));
-    const id = notifRef.key || `notif_${Date.now()}`;
-    const notification: AppNotification = {
-      ...data,
-      id,
-      timestamp: Date.now(),
-      isRead: false,
-    };
-    await set(ref(database, `notifications/${userId}/${id}`), notification);
-  } catch (err) {
-    console.warn("Failed to create notification:", err);
+  if (!userId) return;
+  const id = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const notification: AppNotification = {
+    ...data,
+    id,
+    timestamp: Date.now(),
+    isRead: false,
+  };
+
+  // 1. Save to local storage for instant multi-tab UI
+  if (typeof window !== "undefined") {
+    const current = getLocalNotifications(userId);
+    const updated = [notification, ...current.filter((n) => n.id !== id)];
+    saveLocalNotifications(userId, updated);
+    notifyChatSync({ type: "notification_change", userId });
+  }
+
+  // 2. Persist to Firebase Realtime Database if connected
+  if (database) {
+    try {
+      await set(ref(database, `notifications/${userId}/${id}`), notification);
+    } catch (err) {
+      console.warn("Failed to create notification in Firebase:", err);
+    }
   }
 }
 
@@ -1541,9 +1624,24 @@ export function subscribeToNotifications(
   userId: string,
   callback: (notifications: AppNotification[]) => void
 ): () => void {
-  if (!database) {
+  if (!userId) {
     callback([]);
     return () => {};
+  }
+
+  // 1. Immediately return local notifications for this user
+  const initial = getLocalNotifications(userId);
+  callback(initial);
+
+  // 2. Listen to cross-tab notification updates
+  const unsubLocal = listenToChatSync((payload) => {
+    if (payload?.type === "notification_change" && payload.userId === userId) {
+      callback(getLocalNotifications(userId));
+    }
+  });
+
+  if (!database) {
+    return () => unsubLocal();
   }
 
   const notifRef = ref(database, `notifications/${userId}`);
@@ -1555,40 +1653,88 @@ export function subscribeToNotifications(
         id: k,
       }));
       list.sort((a, b) => b.timestamp - a.timestamp);
+      saveLocalNotifications(userId, list);
       callback(list);
     } else {
-      callback([]);
+      // If remote is empty, use whatever local user has (e.g. welcome message)
+      callback(getLocalNotifications(userId));
     }
   });
 
-  return () => off(notifRef, "value", listener);
+  return () => {
+    unsubLocal();
+    off(notifRef, "value", listener);
+  };
 }
 
 export async function markNotificationAsRead(userId: string, notificationId: string) {
-  if (!database) return;
-  try {
-    await update(ref(database, `notifications/${userId}/${notificationId}`), {
-      isRead: true,
-    });
-  } catch (err) {
-    console.warn(err);
+  if (!userId) return;
+
+  // 1. Mark read locally
+  if (typeof window !== "undefined") {
+    const list = getLocalNotifications(userId);
+    const updated = list.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n));
+    saveLocalNotifications(userId, updated);
+    notifyChatSync({ type: "notification_change", userId });
+  }
+
+  // 2. Mark read in Firebase
+  if (database) {
+    try {
+      await update(ref(database, `notifications/${userId}/${notificationId}`), {
+        isRead: true,
+      });
+    } catch (err) {
+      console.warn(err);
+    }
   }
 }
 
 export async function markAllNotificationsAsRead(userId: string) {
-  if (!database) return;
-  try {
-    const notifRef = ref(database, `notifications/${userId}`);
-    const snap = await get(notifRef);
-    if (snap.exists()) {
-      const updates: Record<string, boolean> = {};
-      Object.keys(snap.val()).forEach((k) => {
-        updates[`${k}/isRead`] = true;
-      });
-      await update(notifRef, updates);
+  if (!userId) return;
+
+  // 1. Mark all read locally
+  if (typeof window !== "undefined") {
+    const list = getLocalNotifications(userId);
+    const updated = list.map((n) => ({ ...n, isRead: true }));
+    saveLocalNotifications(userId, updated);
+    notifyChatSync({ type: "notification_change", userId });
+  }
+
+  // 2. Mark all read in Firebase
+  if (database) {
+    try {
+      const notifRef = ref(database, `notifications/${userId}`);
+      const snap = await get(notifRef);
+      if (snap.exists()) {
+        const updates: Record<string, boolean> = {};
+        Object.keys(snap.val()).forEach((k) => {
+          updates[`${k}/isRead`] = true;
+        });
+        await update(notifRef, updates);
+      }
+    } catch (err) {
+      console.warn(err);
     }
-  } catch (err) {
-    console.warn(err);
+  }
+}
+
+export async function clearAllNotifications(userId: string) {
+  if (!userId) return;
+
+  // 1. Clear locally
+  if (typeof window !== "undefined") {
+    saveLocalNotifications(userId, []);
+    notifyChatSync({ type: "notification_change", userId });
+  }
+
+  // 2. Clear in Firebase
+  if (database) {
+    try {
+      await remove(ref(database, `notifications/${userId}`));
+    } catch (err) {
+      console.warn("Failed to clear notifications in DB:", err);
+    }
   }
 }
 
