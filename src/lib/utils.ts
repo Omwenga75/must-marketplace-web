@@ -13,6 +13,32 @@ export function formatPrice(amount: number): string {
   }).format(amount).replace("KES", "KSh");
 }
 
+/** Format a date as DD/MM/YYYY */
+export function formatDate(dateStringOrTimestamp: string | number): string {
+  try {
+    if (!dateStringOrTimestamp) return "";
+    let timestamp = 0;
+    if (typeof dateStringOrTimestamp === "number") {
+      timestamp = dateStringOrTimestamp;
+    } else {
+      const num = Number(dateStringOrTimestamp);
+      if (!isNaN(num) && num > 1000000000) {
+        timestamp = num;
+      } else {
+        timestamp = new Date(dateStringOrTimestamp).getTime();
+      }
+    }
+    if (isNaN(timestamp) || timestamp <= 0) return String(dateStringOrTimestamp);
+    const d = new Date(timestamp);
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return String(dateStringOrTimestamp);
+  }
+}
+
 export function formatRelativeTime(dateStringOrTimestamp: string | number): string {
   try {
     if (!dateStringOrTimestamp) return "recently";

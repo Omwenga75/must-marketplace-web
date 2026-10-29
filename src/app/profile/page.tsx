@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { UNIVERSITY_LOCATIONS } from "@/lib/constants";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { update } from "firebase/database";
 import { ref } from "firebase/database";
 import { database } from "@/lib/firebase/config";
@@ -144,7 +144,7 @@ export default function ProfilePage() {
               )}
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>Joined {formatRelativeTime(user.memberSince)}</span>
+                <span>Joined {formatDate(user.memberSince)}</span>
               </span>
             </div>
           </div>
