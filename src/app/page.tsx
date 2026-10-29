@@ -21,6 +21,7 @@ import {
   Armchair,
   Dumbbell,
   Package,
+  UtensilsCrossed,
 } from "lucide-react";
 import { Product } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
@@ -36,6 +37,7 @@ const categoryIcons: Record<string, { icon: React.ComponentType<{ className?: st
   "3": { icon: BookOpen, gradient: "from-amber-500 to-orange-500" },
   "4": { icon: Home, gradient: "from-emerald-500 to-teal-500" },
   "5": { icon: Armchair, gradient: "from-violet-500 to-purple-500" },
+  "6": { icon: UtensilsCrossed, gradient: "from-amber-500 to-orange-500" },
   "7": { icon: Dumbbell, gradient: "from-red-500 to-rose-600" },
   "8": { icon: Package, gradient: "from-slate-500 to-slate-600" },
 };

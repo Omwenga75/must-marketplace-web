@@ -6,6 +6,7 @@ export const SAMPLE_CATEGORIES: Category[] = [
   { id: "3", name: "Books", icon: "📚", description: "Textbooks, revision guides & notes" },
   { id: "4", name: "House Items", icon: "🏠", description: "Bedding, curtains, cooking & room essentials" },
   { id: "5", name: "Furniture", icon: "🪑", description: "Chairs, study desks, tables & racks" },
+  { id: "6", name: "Food", icon: "🍔", description: "Snacks, groceries, cooked meals & beverages" },
   { id: "7", name: "Sports", icon: "⚽", description: "Gym equipment, balls, jerseys & fitness" },
   { id: "8", name: "Others", icon: "📦", description: "Miscellaneous university items & supplies" },
 ];
@@ -35,7 +36,7 @@ export const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
   "3": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=800&auto=format&fit=crop",
   "4": "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?q=80&w=800&auto=format&fit=crop",
   "5": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=800&auto=format&fit=crop",
-  "6": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop",
+  "6": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=800&auto=format&fit=crop",
   "7": "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?q=80&w=800&auto=format&fit=crop",
   "8": "https://images.unsplash.com/photo-1507668077129-56e32842fceb?q=80&w=800&auto=format&fit=crop",
 };
@@ -52,7 +53,7 @@ export const INITIAL_SAMPLE_PRODUCTS: Product[] = [
     description: "Solid mountain bike in good condition. Smooth gear shifting, dual disc brakes, wide fat tires. Ideal for navigating around campus and Main Gate / Nchiru.",
     price: 32999,
     condition: "SECOND_HAND",
-    category: SAMPLE_CATEGORIES[5], // Sports
+    category: SAMPLE_CATEGORIES[6], // Sports
     location: "Main Gate",
     imageUrls: ["https://images.unsplash.com/photo-1485965120184-e220f721d03e?q=80&w=800&auto=format&fit=crop"],
     status: "ACTIVE",
