@@ -31,6 +31,7 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   clearAllNotifications,
+  createNotification,
 } from "@/lib/firebase/services";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -349,6 +350,30 @@ export default function NotificationsPage() {
 
     return () => unsub();
   }, [user?.id]);
+
+  // Recovery: if a real user still has 0 notifications after Firebase responds
+  // (e.g. data was wiped by a previous bug), seed them a welcome notification.
+  useEffect(() => {
+    if (!user?.id || user.id.startsWith("demo_")) return;
+    if (loading) return;
+    if (notifications.length > 0) return;
+
+    const timer = setTimeout(() => {
+      // Double-check local storage is still empty before writing
+      const current = getLocalNotifications(user.id);
+      if (current.length === 0) {
+        createNotification(user.id, {
+          title: `Welcome to MUST Marketplace! 🎉`,
+          message:
+            "Buy & sell affordable electronics, books, furniture & campus essentials safely with fellow students across Main Gate, Nchiru & California.",
+          type: "welcome",
+          priority: "NORMAL",
+        }).catch(() => {});
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [user?.id, loading, notifications.length]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const readCount = notifications.filter((n) => n.isRead).length;
