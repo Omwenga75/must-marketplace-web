@@ -104,7 +104,7 @@ export default function ContactPage() {
               <span>Campus Security Notice</span>
             </div>
             <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-              For your safety, always meet buyers and sellers in daylight hours at high-traffic campus zones like the Library Foyer, Student Center, or Gate A. Never pay prior to physical inspection.
+              For your safety, always meet buyers and sellers during day-time hours at open places like Main Gate.
             </p>
           </div>
         </div>
