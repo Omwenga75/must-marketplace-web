@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Send,
@@ -24,7 +24,7 @@ import {
   setTypingStatus,
   deduplicateConversations,
 } from "@/lib/firebase/services";
-import { formatRelativeTime, formatMessageTime } from "@/lib/utils";
+import { formatRelativeTime, formatMessageTime, isAdministratorEmail } from "@/lib/utils";
 import { resolveCanonicalId } from "@/lib/userCanonical";
 
 // ── Skeletons (matching mobile app ShimmerEffect.kt) ─────────────────────────
@@ -59,8 +59,16 @@ function ChatBubbleSkeleton({ isMine }: { isMine: boolean }) {
 }
 
 function MessagesContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading, loginAsDemoUser } = useAuth();
+
+  // Redirect admins away from regular user chats to admin portal
+  useEffect(() => {
+    if (!authLoading && user && (user.isAdmin || user.admin || isAdministratorEmail(user.email))) {
+      router.replace("/admin");
+    }
+  }, [authLoading, user, router]);
 
   // Query parameters when arriving from a product page
   const sellerIdQuery = searchParams.get("sellerId");

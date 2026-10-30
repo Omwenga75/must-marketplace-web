@@ -264,8 +264,8 @@ export default function Navbar() {
               <Plus className="w-5 h-5 stroke-[2.5]" />
             </Link>
 
-            {/* Messages Icon (Desktop only, mobile has it in bottom nav) */}
-            {user && (
+            {/* Messages Icon (Desktop only, mobile has it in bottom nav) — Hidden for Admins */}
+            {user && !isUserAdmin && (
               <Link
                 href="/messages"
                 className="hidden sm:inline-flex relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -280,8 +280,8 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* Notifications Icon */}
-            {user && (
+            {/* Notifications Icon — Hidden for Admins */}
+            {user && !isUserAdmin && (
               <Link
                 href="/notifications"
                 className="relative p-1.5 sm:p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -607,22 +607,36 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <Link
-          href="/messages"
-          className={`flex flex-col items-center gap-0.5 p-1 relative ${
-            pathname?.startsWith("/messages")
-              ? "text-emerald-600 dark:text-emerald-400 font-bold"
-              : ""
-          }`}
-        >
-          <MessageCircle className="w-5 h-5" />
-          {unreadMessages > 0 && (
-            <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-secondary text-white text-[9px] font-bold flex items-center justify-center">
-              {unreadMessages}
-            </span>
-          )}
-          <span>Chats</span>
-        </Link>
+        {isUserAdmin ? (
+          <Link
+            href="/admin"
+            className={`flex flex-col items-center gap-0.5 p-1 relative ${
+              pathname?.startsWith("/admin")
+                ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                : ""
+            }`}
+          >
+            <ShieldCheck className="w-5 h-5 text-secondary" />
+            <span>Admin</span>
+          </Link>
+        ) : (
+          <Link
+            href="/messages"
+            className={`flex flex-col items-center gap-0.5 p-1 relative ${
+              pathname?.startsWith("/messages")
+                ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                : ""
+            }`}
+          >
+            <MessageCircle className="w-5 h-5" />
+            {unreadMessages > 0 && (
+              <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-secondary text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadMessages}
+              </span>
+            )}
+            <span>Chats</span>
+          </Link>
+        )}
 
         <Link
           href={!mounted ? "/login" : user ? "/profile" : "/login"}

@@ -1512,6 +1512,39 @@ export function getDemoNotifications(name: string = "Comrade"): AppNotification[
   ];
 }
 
+export function deduplicateNotifications(list: AppNotification[]): AppNotification[] {
+  if (!Array.isArray(list)) return [];
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
+  const result: AppNotification[] = [];
+
+  for (const n of list) {
+    if (!n || !n.id) continue;
+    if (seenIds.has(n.id)) continue;
+
+    // Normalize title & message: strip non-alphanumeric and compare
+    const cleanTitle = (n.title || "")
+      .replace(/[^\w\s]/gi, "")
+      .trim()
+      .toLowerCase();
+    const cleanMsg = (n.message || "")
+      .replace(/[^\w\s]/gi, "")
+      .trim()
+      .toLowerCase();
+    const sig = `${cleanTitle}:::${cleanMsg}`;
+
+    if (seenSignatures.has(sig)) {
+      continue;
+    }
+
+    seenIds.add(n.id);
+    seenSignatures.add(sig);
+    result.push(n);
+  }
+
+  return result;
+}
+
 export function getLocalNotifications(userId: string): AppNotification[] {
   if (typeof window === "undefined" || !userId) return [];
   const deletedNotifs = getDeletedNotificationIds();
@@ -1538,7 +1571,18 @@ export function getLocalNotifications(userId: string): AppNotification[] {
       let addedAny = false;
       broadcasts.forEach((b) => {
         const id = `broadcast_${b.timestamp}`;
-        if (!existingIds.has(id) && !deletedNotifs.has(id)) {
+        const cleanBTitle = (b.title || "").replace(/[^\w\s]/gi, "").trim().toLowerCase();
+        const cleanBMsg = (b.message || "").replace(/[^\w\s]/gi, "").trim().toLowerCase();
+        const bSig = `${cleanBTitle}:::${cleanBMsg}`;
+
+        const alreadyExists = saved.some((s) => {
+          if (s.id === id) return true;
+          const sTitle = (s.title || "").replace(/[^\w\s]/gi, "").trim().toLowerCase();
+          const sMsg = (s.message || "").replace(/[^\w\s]/gi, "").trim().toLowerCase();
+          return `${sTitle}:::${sMsg}` === bSig;
+        });
+
+        if (!existingIds.has(id) && !alreadyExists && !deletedNotifs.has(id)) {
           addedAny = true;
           saved.unshift({
             id,
@@ -1551,12 +1595,18 @@ export function getLocalNotifications(userId: string): AppNotification[] {
           });
         }
       });
+
+      // Deduplicate to clean up any past legacy duplicates
+      saved = deduplicateNotifications(saved);
+
       // Save the merged list so it persists
-      if (addedAny) {
+      if (addedAny || raw !== null) {
         try {
           localStorage.setItem(`must_notifications_${userId}`, JSON.stringify(saved));
         } catch {}
       }
+    } else {
+      saved = deduplicateNotifications(saved);
     }
 
     if (hasLoaded) return saved;
@@ -1564,7 +1614,7 @@ export function getLocalNotifications(userId: string): AppNotification[] {
 
   // For demo accounts without any prior local history, initialize with clean demo notifications
   if (userId.startsWith("demo_") && deletedNotifs.size === 0) {
-    const demos = getDemoNotifications();
+    const demos = deduplicateNotifications(getDemoNotifications());
     saveLocalNotifications(userId, demos);
     return demos;
   }
@@ -1643,8 +1693,9 @@ export function subscribeToNotifications(
         id: k,
       }));
       list.sort((a, b) => b.timestamp - a.timestamp);
-      saveLocalNotifications(userId, list);
-      callback(list);
+      const dedupled = deduplicateNotifications(list);
+      saveLocalNotifications(userId, dedupled);
+      callback(dedupled);
     } else {
       if (!userId.startsWith("demo_")) {
         // Real user has no notifications in DB -> sync local to empty as well
@@ -1849,16 +1900,29 @@ export async function sendAdminBroadcast(
   priority: "URGENT" | "NORMAL" | "INFO" = "NORMAL"
 ) {
   const timestamp = Date.now();
-  const broadcastEntry = { title, message, priority, timestamp, sentBy: "Admin" };
+  const cleanTitle = (title || "").trim();
+  const cleanMessage = (message || "").trim();
+  const broadcastEntry = { title: cleanTitle, message: cleanMessage, priority, timestamp, sentBy: "Admin" };
 
   // 1. Save to shared localStorage so ALL users see it on next load
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("must_admin_broadcasts");
       const existing: typeof broadcastEntry[] = raw ? JSON.parse(raw) : [];
-      existing.unshift(broadcastEntry);
-      // Keep only last 50 broadcasts
-      localStorage.setItem("must_admin_broadcasts", JSON.stringify(existing.slice(0, 50)));
+
+      // Avoid double-dispatch of identical broadcast within 30 seconds
+      const isRecentDuplicate = existing.some(
+        (b) =>
+          b.title.toLowerCase().trim() === cleanTitle.toLowerCase() &&
+          b.message.toLowerCase().trim() === cleanMessage.toLowerCase() &&
+          Math.abs(timestamp - b.timestamp) < 30 * 1000
+      );
+
+      if (!isRecentDuplicate) {
+        existing.unshift(broadcastEntry);
+        // Keep only last 50 broadcasts
+        localStorage.setItem("must_admin_broadcasts", JSON.stringify(existing.slice(0, 50)));
+      }
     } catch {}
   }
 

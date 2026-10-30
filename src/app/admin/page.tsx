@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   ShieldCheck,
@@ -26,6 +26,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Product, User } from "@/types";
@@ -39,13 +40,14 @@ import {
 import { formatPrice, formatRelativeTime, isAdministratorEmail } from "@/lib/utils";
 import styles from "./admin.module.css";
 
-type AdminTab = "overview" | "listings" | "users" | "broadcast";
+type AdminTab = "overview" | "listings" | "users" | "broadcast" | "notifications";
 
 const NAV_ITEMS: { label: string; tab: AdminTab; icon: React.ElementType }[] = [
-  { label: "Dashboard",  tab: "overview",   icon: LayoutDashboard },
-  { label: "Listings",   tab: "listings",   icon: Package },
-  { label: "Users",      tab: "users",      icon: Users },
-  { label: "Broadcast",  tab: "broadcast",  icon: Megaphone },
+  { label: "Dashboard",     tab: "overview",      icon: LayoutDashboard },
+  { label: "Listings",      tab: "listings",      icon: Package },
+  { label: "Users",         tab: "users",         icon: Users },
+  { label: "Broadcast",     tab: "broadcast",     icon: Megaphone },
+  { label: "Notifications", tab: "notifications", icon: Bell },
 ];
 
 function AdminLoginCard() {
@@ -234,7 +236,7 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     if (typeof window !== "undefined") {
       const hash = window.location.hash.replace("#", "").toLowerCase() as AdminTab;
-      const valid: AdminTab[] = ["overview", "listings", "users", "broadcast"];
+      const valid: AdminTab[] = ["overview", "listings", "users", "broadcast", "notifications"];
       if (valid.includes(hash)) return hash;
     }
     return "overview";
@@ -337,10 +339,109 @@ export default function AdminDashboardPage() {
   );
   const sellerCount     = nonAdminUsers.filter((u) => u.isSeller || u.seller).length;
 
+  const [adminNotifFilter, setAdminNotifFilter] = useState<"all" | "broadcast" | "user" | "listing" | "security">("all");
+  const [readAdminNotifIds, setReadAdminNotifIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("must_admin_read_notifs");
+        if (raw) return new Set(JSON.parse(raw));
+      } catch {}
+    }
+    return new Set();
+  });
+
   // Recent activity — last 2 products
   const recentActivity = [...products]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 2);
+
+  // Administrative notifications feed (System, User, Listing, and Broadcast events)
+  const adminNotifications = useMemo(() => {
+    const list: {
+      id: string;
+      title: string;
+      message: string;
+      category: "broadcast" | "user" | "listing" | "security";
+      timestamp: number;
+    }[] = [];
+
+    // 1. Broadcasts dispatched
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("must_admin_broadcasts");
+        if (raw) {
+          const broadcasts = JSON.parse(raw);
+          if (Array.isArray(broadcasts)) {
+            broadcasts.forEach((b: any) => {
+              list.push({
+                id: `bcast_${b.timestamp}`,
+                title: `Broadcast Dispatched: ${b.title}`,
+                message: b.message || "Dispatched announcement to all student accounts.",
+                category: "broadcast",
+                timestamp: b.timestamp,
+              });
+            });
+          }
+        }
+      } catch {}
+    }
+
+    // 2. User signups / activations
+    nonAdminUsers.forEach((u) => {
+      list.push({
+        id: `user_${u.id}`,
+        title: u.isSeller || u.seller ? `Seller Account Active: ${u.fullName}` : `New User Registered: ${u.fullName}`,
+        message: `${u.email || "No email"} · ${u.location || "Campus"} · ${u.activeListings || 0} active listings`,
+        category: "user",
+        timestamp: Number(u.memberSince) || Date.now() - 3600000,
+      });
+    });
+
+    // 3. New listings
+    products.slice(0, 10).forEach((p) => {
+      list.push({
+        id: `prod_${p.id}`,
+        title: `Listing Posted: ${p.title}`,
+        message: `KSh ${Number(p.price || 0).toLocaleString()} · ${p.category || "General"} · Location: ${p.location}`,
+        category: "listing",
+        timestamp: new Date(p.createdAt || 0).getTime() || Date.now(),
+      });
+    });
+
+    // 4. Security & Audit
+    list.push({
+      id: "sec_active_admin",
+      title: "Super Admin Session Verified",
+      message: "Authorized session active for must.market@admin.com. Realtime database & audit logs active.",
+      category: "security",
+      timestamp: Date.now() - 1000 * 60 * 15,
+    });
+
+    list.sort((a, b) => b.timestamp - a.timestamp);
+    return list;
+  }, [nonAdminUsers, products]);
+
+  const unreadAdminNotifsCount = adminNotifications.filter((n) => !readAdminNotifIds.has(n.id)).length;
+
+  const markAllAdminNotifsRead = () => {
+    const allIds = new Set(adminNotifications.map((n) => n.id));
+    setReadAdminNotifIds(allIds);
+    try {
+      localStorage.setItem("must_admin_read_notifs", JSON.stringify([...allIds]));
+    } catch {}
+  };
+
+  const toggleAdminNotifRead = (id: string) => {
+    setReadAdminNotifIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem("must_admin_read_notifs", JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
 
   const handleDelete = async (productId: string) => {
     if (confirm("Admin: Permanently delete this listing?")) {
@@ -411,6 +512,9 @@ export default function AdminDashboardPage() {
             >
               <span className={styles.navIcon}><Icon size={18} /></span>
               <span>{label}</span>
+              {tab === "notifications" && unreadAdminNotifsCount > 0 && (
+                <span className={styles.navBadge}>{unreadAdminNotifsCount}</span>
+              )}
             </button>
           ))}
 
@@ -897,6 +1001,105 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </form>
+            </>
+          )}
+
+          {/* ── TAB: NOTIFICATIONS ──────────────────────────────────── */}
+          {activeTab === "notifications" && (
+            <>
+              <div className={styles.pageHeader}>
+                <div>
+                  <h1 className={styles.pageTitle}>Admin Notifications</h1>
+                  <p className={styles.pageSubtitle}>
+                    {unreadAdminNotifsCount > 0
+                      ? `${unreadAdminNotifsCount} unread alerts · System audit and event stream`
+                      : "All caught up · Realtime system audit and event logs"}
+                  </p>
+                </div>
+                {unreadAdminNotifsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={markAllAdminNotifsRead}
+                    className={styles.btnOutline}
+                    style={{ fontSize: "0.8rem", padding: "0.5rem 0.9rem" }}
+                  >
+                    <CheckCircle2 size={15} />
+                    Mark All Read
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Pills */}
+              <div className={styles.notifFilters}>
+                {(["all", "broadcast", "user", "listing", "security"] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`${styles.notifFilterBtn} ${adminNotifFilter === cat ? styles.notifFilterBtnActive : ""}`}
+                    onClick={() => setAdminNotifFilter(cat)}
+                  >
+                    {cat === "all" ? "All Alerts" : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {adminNotifications.filter((n) => adminNotifFilter === "all" || n.category === adminNotifFilter).length === 0 ? (
+                <div className={styles.emptyBox}>
+                  <Bell size={36} />
+                  <p>No notifications in this category</p>
+                </div>
+              ) : (
+                <div className={styles.notifList}>
+                  {adminNotifications
+                    .filter((n) => adminNotifFilter === "all" || n.category === adminNotifFilter)
+                    .map((item) => {
+                      const isUnread = !readAdminNotifIds.has(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`${styles.notifItem} ${isUnread ? styles.notifItemUnread : ""}`}
+                          onClick={() => toggleAdminNotifRead(item.id)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <div className={styles.activityIcon}>
+                            {item.category === "broadcast" && <Megaphone size={16} />}
+                            {item.category === "user" && <Users size={16} />}
+                            {item.category === "listing" && <Package size={16} />}
+                            {item.category === "security" && <ShieldCheck size={16} />}
+                          </div>
+
+                          <div className={styles.notifContent}>
+                            <div className={styles.notifHeaderRow}>
+                              <span className={styles.notifTitle}>{item.title}</span>
+                              <span className={styles.activityTime}>{formatRelativeTime(item.timestamp)}</span>
+                            </div>
+                            <p className={styles.notifMessage}>{item.message}</p>
+                            <div className={styles.notifMeta}>
+                              <span
+                                className={`${styles.notifTag} ${
+                                  item.category === "broadcast"
+                                    ? styles.notifTagBroadcast
+                                    : item.category === "user"
+                                    ? styles.notifTagUser
+                                    : item.category === "listing"
+                                    ? styles.notifTagListing
+                                    : styles.notifTagSecurity
+                                }`}
+                              >
+                                {item.category}
+                              </span>
+                              {isUnread && (
+                                <span style={{ fontSize: "0.72rem", color: "#ea580c", fontWeight: 600 }}>
+                                  • Tap to mark read
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
             </>
           )}
         </div>

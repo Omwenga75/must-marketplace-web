@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   MessageCircle,
@@ -34,8 +35,9 @@ import {
   markAllNotificationsAsRead,
   clearAllNotifications,
   deleteNotification,
+  deduplicateNotifications,
 } from "@/lib/firebase/services";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, isAdministratorEmail } from "@/lib/utils";
 
 // ─── Type config ──────────────────────────────────────────────────────────────
 const TYPE_CONFIG: Record<
@@ -342,11 +344,19 @@ function GroupLabel({ label }: { label: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // If administrator visits user-side notifications, redirect to admin portal notifications
+  useEffect(() => {
+    if (!authLoading && user && (user.isAdmin || user.admin || isAdministratorEmail(user.email))) {
+      router.replace("/admin#notifications");
+    }
+  }, [user, authLoading, router]);
 
   // Prevent background scrolling when mobile drawer is open
   useEffect(() => {
@@ -379,12 +389,12 @@ export default function NotificationsPage() {
     }
 
     setLoading(true);
-    const initial = getLocalNotifications(user.id);
+    const initial = deduplicateNotifications(getLocalNotifications(user.id));
     setNotifications(initial);
     setLoading(false);
 
     const unsub = subscribeToNotifications(user.id, (list) => {
-      setNotifications(list);
+      setNotifications(deduplicateNotifications(list));
       setLoading(false);
     });
 
