@@ -1275,157 +1275,24 @@ export async function setTypingStatus(
 // ─────────────────────────────────────────────────────────────
 
 const initialChatroomMessages: Record<ChatroomTopic, ChatroomMessage[]> = {
-  general: [
-    {
-      id: "cm-gen-1",
-      senderId: "u1",
-      senderName: "James Mutua",
-      senderRole: "seller",
-      content: "Hey comrades! If anyone is looking for genuine phone accessories or fast chargers around Nchiru, hit me up on DM.",
-      topic: "general",
-      timestamp: String(Date.now() - 45 * 60 * 1000),
-      likes: 6,
-      likedBy: [],
-    },
-    {
-      id: "cm-gen-2",
-      senderId: "u3",
-      senderName: "Brian Mwenda",
-      senderRole: "seller",
-      content: "Selling Casio fx-991EX scientific calculator for engineering math. KSh 2,200 negotiable. Available at Library Foyer today.",
-      topic: "general",
-      timestamp: String(Date.now() - 25 * 60 * 1000),
-      likes: 4,
-      likedBy: [],
-      productTag: {
-        id: "prod-2",
-        title: "Casio fx-991EX ClassWiz",
-        price: 2200,
-      },
-    },
-    {
-      id: "cm-gen-3",
-      senderId: "u2",
-      senderName: "Lucy Wangari",
-      senderRole: "student",
-      content: "Reminder comrades: Always meet sellers in public spots (Library foyer or Student Center) and test electronics before sending M-Pesa!",
-      topic: "general",
-      timestamp: String(Date.now() - 10 * 60 * 1000),
-      likes: 12,
-      likedBy: [],
-    },
-  ],
-  hostels: [
-    {
-      id: "cm-hos-1",
-      senderId: "u5",
-      senderName: "Dennis Kiprono",
-      senderRole: "student",
-      content: "California Block B: Anyone selling a 6kg gas cylinder with burner? Ready to buy today.",
-      topic: "hostels",
-      timestamp: String(Date.now() - 60 * 60 * 1000),
-      likes: 2,
-      likedBy: [],
-    },
-    {
-      id: "cm-hos-2",
-      senderId: "u6",
-      senderName: "Mercy Wanjiku",
-      senderRole: "seller",
-      content: "Study desk and comfortable swivel chair ready for pickup at Nchiru near Gate B. Moving out end of month.",
-      topic: "hostels",
-      timestamp: String(Date.now() - 30 * 60 * 1000),
-      likes: 5,
-      likedBy: [],
-    },
-    {
-      id: "cm-hos-3",
-      senderId: "u1",
-      senderName: "James Mutua",
-      senderRole: "seller",
-      content: "Making deliveries to Mascan and Heritage hostels around 4pm today for anyone ordering phone gear.",
-      topic: "hostels",
-      timestamp: String(Date.now() - 15 * 60 * 1000),
-      likes: 3,
-      likedBy: [],
-    },
-  ],
-  requests: [
-    {
-      id: "cm-req-1",
-      senderId: "u7",
-      senderName: "Eric Kimathi",
-      senderRole: "student",
-      content: "Looking for 2nd Year Computer Science Data Structures textbook or revision booklet. Who has a copy to sell or rent?",
-      topic: "requests",
-      timestamp: String(Date.now() - 50 * 60 * 1000),
-      likes: 3,
-      likedBy: [],
-    },
-    {
-      id: "cm-req-2",
-      senderId: "u8",
-      senderName: "Sharon Achieng",
-      senderRole: "student",
-      content: "Need an electric hot kettle in clean condition. Budget is KSh 800 - 1,200. DM me please!",
-      topic: "requests",
-      timestamp: String(Date.now() - 20 * 60 * 1000),
-      likes: 2,
-      likedBy: [],
-    },
-    {
-      id: "cm-req-3",
-      senderId: "u9",
-      senderName: "Collins Kipruto",
-      senderRole: "student",
-      content: "Looking for a steam iron box around California hostels. Urgent for graduation prep.",
-      topic: "requests",
-      timestamp: String(Date.now() - 5 * 60 * 1000),
-      likes: 1,
-      likedBy: [],
-    },
-  ],
-  study: [
-    {
-      id: "cm-std-1",
-      senderId: "u11",
-      senderName: "Faith Chebet",
-      senderRole: "student",
-      content: "Selling Engineering Mathematics by K.A. Stroud (7th Edition). Neat, no torn pages. KSh 1,500. Can meet at Engineering Block foyer.",
-      topic: "study",
-      timestamp: String(Date.now() - 35 * 60 * 1000),
-      likes: 4,
-      likedBy: [],
-      productTag: {
-        id: "prod-std-1",
-        title: "Engineering Mathematics (Stroud)",
-        price: 1500,
-      },
-    },
-    {
-      id: "cm-std-2",
-      senderId: "u12",
-      senderName: "Kevin Ochieng",
-      senderRole: "student",
-      content: "Anyone selling a clean white Science/Nursing Lab Coat (Size M or L)? Needed before Thursday practicals.",
-      topic: "study",
-      timestamp: String(Date.now() - 15 * 60 * 1000),
-      likes: 3,
-      likedBy: [],
-    },
-  ],
+  general: [],
+  hostels: [],
+  requests: [],
+  study: [],
 };
 
 export function getLocalChatroomMessages(topic: ChatroomTopic): ChatroomMessage[] {
-  if (typeof window === "undefined") return initialChatroomMessages[topic] || [];
+  if (typeof window === "undefined") return [];
   try {
     const stored = localStorage.getItem(`must_chatroom_${topic}`);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      // Purge any stored fake/seed messages (ids starting with "cm-")
+      const real = parsed.filter((m: ChatroomMessage) => !m.id.startsWith("cm-"));
+      if (Array.isArray(real) && real.length > 0) return real;
     }
   } catch {}
-  return initialChatroomMessages[topic] || [];
+  return [];
 }
 
 export function saveLocalChatroomMessages(topic: ChatroomTopic, msgs: ChatroomMessage[]) {
@@ -1566,10 +1433,41 @@ export function getLocalNotifications(userId: string): AppNotification[] {
   if (typeof window === "undefined" || !userId) return [];
   try {
     const raw = localStorage.getItem(`must_notifications_${userId}`);
+    let saved: AppNotification[] = [];
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) saved = parsed;
     }
+
+    // Merge any admin broadcasts the user hasn't seen yet
+    const broadcastsRaw = localStorage.getItem("must_admin_broadcasts");
+    if (broadcastsRaw) {
+      const broadcasts: { title: string; message: string; priority: string; timestamp: number }[] =
+        JSON.parse(broadcastsRaw);
+      const existingIds = new Set(saved.map((n) => n.id));
+      broadcasts.forEach((b) => {
+        const id = `broadcast_${b.timestamp}`;
+        if (!existingIds.has(id)) {
+          saved.unshift({
+            id,
+            title: `📢 ${b.title}`,
+            message: b.message,
+            type: "system",
+            priority: b.priority as "URGENT" | "NORMAL" | "INFO",
+            timestamp: b.timestamp,
+            isRead: false,
+          });
+        }
+      });
+      // Save the merged list so it persists
+      if (broadcasts.length > 0) {
+        try {
+          localStorage.setItem(`must_notifications_${userId}`, JSON.stringify(saved));
+        } catch {}
+      }
+    }
+
+    if (saved.length > 0) return saved;
   } catch {}
 
   // For demo accounts only, initialize with clean demo notifications
@@ -1795,25 +1693,39 @@ export async function sendAdminBroadcast(
   message: string,
   priority: "URGENT" | "NORMAL" | "INFO" = "NORMAL"
 ) {
-  if (!database) return;
-  const users = await fetchAllUsers();
-  const promises = users.map((u) =>
-    createNotification(u.id, {
-      title: `📢 ${title}`,
-      message,
-      type: "system",
-      priority,
-    })
-  );
-  await Promise.all(promises);
+  const timestamp = Date.now();
+  const broadcastEntry = { title, message, priority, timestamp, sentBy: "Admin" };
 
-  // Also log broadcast
-  const bRef = push(ref(database, "admin_broadcasts"));
-  await set(bRef, {
-    title,
-    message,
-    priority,
-    timestamp: Date.now(),
-    sentBy: "Admin",
-  });
+  // 1. Save to shared localStorage so ALL users see it on next load
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("must_admin_broadcasts");
+      const existing: typeof broadcastEntry[] = raw ? JSON.parse(raw) : [];
+      existing.unshift(broadcastEntry);
+      // Keep only last 50 broadcasts
+      localStorage.setItem("must_admin_broadcasts", JSON.stringify(existing.slice(0, 50)));
+    } catch {}
+  }
+
+  // 2. Notify all real Firebase users (if connected)
+  if (database) {
+    try {
+      const users = await fetchAllUsers();
+      await Promise.all(
+        users.map((u) =>
+          createNotification(u.id, {
+            title: `📢 ${title}`,
+            message,
+            type: "system",
+            priority,
+          })
+        )
+      );
+      // Log broadcast to Firebase
+      const bRef = push(ref(database, "admin_broadcasts"));
+      await set(bRef, broadcastEntry);
+    } catch (err) {
+      console.warn("Firebase broadcast failed (local delivery still succeeded):", err);
+    }
+  }
 }

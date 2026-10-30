@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -289,50 +289,7 @@ export default function AdminDashboardPage() {
     Promise.all([fetchProducts(), fetchAllUsers()])
       .then(([prods, users]) => {
         setProducts(prods);
-        if (users.length > 0) {
-          setUsersList(users);
-        } else {
-          setUsersList([
-            {
-              id: "u1",
-              fullName: "James Mutua",
-              email: "james.mutua@student.must.ac.ke",
-              phone: "+254 712 345 678",
-              location: "Nchiru",
-              isSeller: true,
-              seller: true,
-              memberSince: "1704067200000",
-              activeListings: 2,
-              soldItems: 5,
-              likes: 45,
-            },
-            {
-              id: "u2",
-              fullName: "Mary Kamau",
-              email: "mary.kamau@student.must.ac.ke",
-              phone: "+254 722 987 654",
-              location: "Main Gate",
-              isSeller: true,
-              seller: true,
-              memberSince: "1706745600000",
-              activeListings: 1,
-              soldItems: 3,
-              likes: 48,
-            },
-            {
-              id: "u3",
-              fullName: "Brian Njoroge",
-              email: "brian.njoroge@student.must.ac.ke",
-              location: "California",
-              isSeller: false,
-              seller: false,
-              memberSince: "1709251200000",
-              activeListings: 0,
-              soldItems: 0,
-              likes: 12,
-            },
-          ]);
-        }
+        setUsersList(users);
         setLoading(false);
       })
       .catch(() => setLoading(false));
