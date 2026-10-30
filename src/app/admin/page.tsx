@@ -131,7 +131,7 @@ function AdminLoginCard() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="flex-1 min-h-screen min-h-[100dvh] w-full flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
