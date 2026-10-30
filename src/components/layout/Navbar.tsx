@@ -339,60 +339,72 @@ export default function Navbar() {
                         {user.email}
                       </p>
                       <div className="mt-1 flex gap-1">
-                        <span className="inline-block px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {user.isSeller ? "Buyer · Seller" : "Buyer"}
-                        </span>
-                        {user.isAdmin && (
-                          <span className="inline-block px-1.5 py-0.5 text-[10px] font-bold rounded bg-primary-container text-primary-dark">
-                            Admin
+                        {user.isAdmin || user.admin ? (
+                          <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-100 dark:bg-orange-950/60 text-secondary">
+                            Administrator
+                          </span>
+                        ) : (
+                          <span className="inline-block px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {user.isSeller ? "Buyer · Seller" : "Buyer"}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <User className="w-4 h-4 text-slate-400" />
-                      <span>My Profile</span>
-                    </Link>
-
-                    {user.isSeller ? (
-                      <Link
-                        href="/seller/dashboard"
-                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        <Store className="w-4 h-4 text-emerald-600" />
-                        <span>Dashboard</span>
-                      </Link>
+                    {user.isAdmin || user.admin ? (
+                      <>
+                        <Link
+                          href="/admin"
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-secondary font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-secondary" />
+                          <span>Admin Portal</span>
+                        </Link>
+                        <Link
+                          href="/profile"
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <User className="w-4 h-4 text-slate-400" />
+                          <span>My Profile</span>
+                        </Link>
+                      </>
                     ) : (
-                      <Link
-                        href="/seller/activate"
-                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-emerald-600 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                      >
-                        <Store className="w-4 h-4 text-emerald-600" />
-                        <span>Become a Seller</span>
-                      </Link>
-                    )}
+                      <>
+                        <Link
+                          href="/profile"
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <User className="w-4 h-4 text-slate-400" />
+                          <span>My Profile</span>
+                        </Link>
 
-                    {user.isAdmin && (
-                      <Link
-                        href="/admin"
-                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-secondary font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/40"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-secondary" />
-                        <span>Admin Portal</span>
-                      </Link>
-                    )}
+                        {user.isSeller ? (
+                          <Link
+                            href="/seller/dashboard"
+                            className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          >
+                            <Store className="w-4 h-4 text-emerald-600" />
+                            <span>Dashboard</span>
+                          </Link>
+                        ) : (
+                          <Link
+                            href="/seller/activate"
+                            className="flex items-center gap-2.5 px-4 py-2 text-sm text-emerald-600 font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                          >
+                            <Store className="w-4 h-4 text-emerald-600" />
+                            <span>Become a Seller</span>
+                          </Link>
+                        )}
 
-                    <Link
-                      href="/saved"
-                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    >
-                      <Heart className="w-4 h-4 text-rose-500" />
-                      <span>Saved Products ({mounted ? favoriteIds.size : 0})</span>
-                    </Link>
+                        <Link
+                          href="/saved"
+                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <Heart className="w-4 h-4 text-rose-500" />
+                          <span>Saved Products ({mounted ? favoriteIds.size : 0})</span>
+                        </Link>
+                      </>
+                    )}
 
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
@@ -503,21 +515,21 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  <Link
-                    href={user.isSeller ? "/seller/dashboard" : "/seller/activate"}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold"
-                  >
-                    {user.isSeller ? "Dashboard" : "Become a Seller"}
-                  </Link>
-
-                  {user.isAdmin && (
+                  {user.isAdmin || user.admin ? (
                     <Link
                       href="/admin"
                       onClick={() => setMobileMenuOpen(false)}
                       className="px-3 py-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-secondary font-semibold"
                     >
                       Admin Portal
+                    </Link>
+                  ) : (
+                    <Link
+                      href={user.isSeller ? "/seller/dashboard" : "/seller/activate"}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold"
+                    >
+                      {user.isSeller ? "Dashboard" : "Become a Seller"}
                     </Link>
                   )}
                 </>
