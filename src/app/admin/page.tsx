@@ -814,14 +814,14 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className={styles.broadcastWrap}>
-                {/* Left card – compose form */}
+              <form onSubmit={handleSendBroadcast} className={styles.broadcastWrap}>
+                {/* Left card – title */}
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>
                       <span className={styles.broadcastHeading}>
                         <Megaphone size={18} className={styles.broadcastIcon} />
-                        Compose Broadcast
+                        Broadcast Title
                       </span>
                     </h2>
                   </div>
@@ -833,93 +833,53 @@ export default function AdminDashboardPage() {
                     </div>
                   )}
 
-                  <form onSubmit={handleSendBroadcast}>
-                    <div className={styles.formGroup}>
-                      <label className={styles.formLabel}>Broadcast Title</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. End of Semester Textbook Drive"
-                        value={broadcastTitle}
-                        onChange={(e) => setBroadcastTitle(e.target.value)}
-                        className={styles.formInput}
-                      />
-                    </div>
-
-                    <div className={styles.formGroup}>
-                      <label className={styles.formLabel}>Message Body</label>
-                      <textarea
-                        rows={5}
-                        required
-                        placeholder="Enter announcement details…"
-                        value={broadcastMessage}
-                        onChange={(e) => setBroadcastMessage(e.target.value)}
-                        className={`${styles.formInput} ${styles.formTextarea}`}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={broadcastSending}
-                      className={styles.btnPrimary}
-                      style={{ width: "100%", justifyContent: "center", padding: "0.9rem" }}
-                    >
-                      <Send size={16} />
-                      {broadcastSending ? "Dispatching…" : "Send to All Students"}
-                    </button>
-                  </form>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>Title</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. End of Semester Textbook Drive"
+                      value={broadcastTitle}
+                      onChange={(e) => setBroadcastTitle(e.target.value)}
+                      className={styles.formInput}
+                    />
+                  </div>
                 </div>
 
-                {/* Right card – broadcast tips / info */}
+                {/* Right card – message + send */}
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>
                       <span className={styles.broadcastHeading}>
                         <Send size={18} className={styles.broadcastIcon} />
-                        Broadcast Guidelines
+                        Message Body
                       </span>
                     </h2>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
-                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
-                        <CheckCircle2 size={15} />
-                      </div>
-                      <div className={styles.activityBody}>
-                        <div className={styles.activityTitle}>Keep it concise</div>
-                        <div className={styles.activitySub}>Use a clear, short title that students will immediately understand.</div>
-                      </div>
-                    </div>
-                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
-                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
-                        <CheckCircle2 size={15} />
-                      </div>
-                      <div className={styles.activityBody}>
-                        <div className={styles.activityTitle}>Broadcast reaches everyone</div>
-                        <div className={styles.activitySub}>All registered students on MUST Marketplace receive this notification instantly.</div>
-                      </div>
-                    </div>
-                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
-                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
-                        <CheckCircle2 size={15} />
-                      </div>
-                      <div className={styles.activityBody}>
-                        <div className={styles.activityTitle}>Use for important updates only</div>
-                        <div className={styles.activitySub}>Reserve broadcasts for campus-wide announcements, policy changes, or urgent alerts.</div>
-                      </div>
-                    </div>
-                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
-                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
-                        <CheckCircle2 size={15} />
-                      </div>
-                      <div className={styles.activityBody}>
-                        <div className={styles.activityTitle}>Cannot be undone</div>
-                        <div className={styles.activitySub}>Once sent, broadcasts cannot be recalled. Review your message before dispatching.</div>
-                      </div>
-                    </div>
+
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>Message</label>
+                    <textarea
+                      rows={5}
+                      required
+                      placeholder="Enter announcement details…"
+                      value={broadcastMessage}
+                      onChange={(e) => setBroadcastMessage(e.target.value)}
+                      className={`${styles.formInput} ${styles.formTextarea}`}
+                    />
                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={broadcastSending}
+                    className={styles.btnPrimary}
+                    style={{ width: "100%", justifyContent: "center", padding: "0.9rem" }}
+                  >
+                    <Send size={16} />
+                    {broadcastSending ? "Dispatching…" : "Send to All Students"}
+                  </button>
                 </div>
-              </div>
+              </form>
             </>
           )}
         </div>
