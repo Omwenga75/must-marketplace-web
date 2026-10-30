@@ -74,7 +74,20 @@ export default function Navbar() {
       }
     }
 
+    const handleCustomThemeChange = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    window.addEventListener("must-theme-change", handleCustomThemeChange);
+
+    const observer = new MutationObserver(() => handleCustomThemeChange());
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
     return () => {
+      window.removeEventListener("must-theme-change", handleCustomThemeChange);
+      observer.disconnect();
       if (mediaQuery) {
         if (typeof mediaQuery.removeEventListener === "function") {
           mediaQuery.removeEventListener("change", handleSystemThemeChange);
@@ -95,6 +108,7 @@ export default function Navbar() {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("must_theme", "light");
     }
+    window.dispatchEvent(new Event("must-theme-change"));
   };
 
   // Subscribe to live unread counts if user is logged in

@@ -23,6 +23,8 @@ import {
   Activity,
   Plus,
   LogOut,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Product, User } from "@/types";
@@ -62,12 +64,47 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Broadcast state
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastSuccess, setBroadcastSuccess] = useState(false);
+
+  // Synchronize color theme across admin dashboard and the rest of the application
+  useEffect(() => {
+    const syncTheme = () => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    };
+    syncTheme();
+
+    window.addEventListener("must-theme-change", syncTheme);
+
+    const observer = new MutationObserver(() => syncTheme());
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => {
+      window.removeEventListener("must-theme-change", syncTheme);
+      observer.disconnect();
+    };
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("must_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("must_theme", "light");
+    }
+    window.dispatchEvent(new Event("must-theme-change"));
+  };
 
   useEffect(() => {
     Promise.all([fetchProducts(), fetchAllUsers()])
@@ -262,15 +299,26 @@ export default function AdminDashboardPage() {
             >
               <Menu size={20} />
             </button>
-            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#f8fafc" }}>
+            <span className={styles.topbarTitle}>
               {NAV_ITEMS.find((n) => n.tab === activeTab)?.label ?? "Admin"}
             </span>
           </div>
 
           <div className={styles.topbarActions}>
+            {/* Adaptive Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className={styles.iconBtn}
+              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+
             <Link href="/" className={styles.iconBtn} title="Back to site">
               <LogOut size={17} />
             </Link>
+
             <div className={styles.profile}>
               <div className={styles.avatar}>
                 {user?.fullName?.[0]?.toUpperCase() ?? "A"}
@@ -308,7 +356,7 @@ export default function AdminDashboardPage() {
               {/* Stat Cards */}
               <div className={styles.statsGrid}>
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon}>
+                  <div className={`${styles.statIcon} ${styles.statIconOrange}`}>
                     <Package size={22} />
                   </div>
                   <div className={styles.statInfo}>
@@ -319,7 +367,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon} style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa" }}>
+                  <div className={`${styles.statIcon} ${styles.statIconBlue}`}>
                     <TrendingUp size={22} />
                   </div>
                   <div className={styles.statInfo}>
@@ -330,7 +378,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon} style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}>
+                  <div className={`${styles.statIcon} ${styles.statIconGreen}`}>
                     <Store size={22} />
                   </div>
                   <div className={styles.statInfo}>
@@ -341,7 +389,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon} style={{ background: "rgba(96,165,250,0.12)", color: "#93c5fd" }}>
+                  <div className={`${styles.statIcon} ${styles.statIconIndigo}`}>
                     <Eye size={22} />
                   </div>
                   <div className={styles.statInfo}>
@@ -352,7 +400,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className={styles.statCard}>
-                  <div className={styles.statIcon} style={{ background: "rgba(244,114,182,0.12)", color: "#f472b6" }}>
+                  <div className={`${styles.statIcon} ${styles.statIconPink}`}>
                     <Heart size={22} />
                   </div>
                   <div className={styles.statInfo}>
@@ -369,7 +417,7 @@ export default function AdminDashboardPage() {
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>Quick Actions</h2>
-                    <ArrowRight size={16} style={{ color: "#64748b" }} />
+                    <ArrowRight size={16} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                     <button
@@ -408,11 +456,11 @@ export default function AdminDashboardPage() {
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>Recent Listings</h2>
-                    <Activity size={16} style={{ color: "#fb923c" }} />
+                    <Activity size={16} />
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                     {loading ? (
-                      <p style={{ color: "#64748b", fontSize: "0.85rem" }}>Loading…</p>
+                      <p className={styles.loadingText}>Loading…</p>
                     ) : recentActivity.length === 0 ? (
                       <div className={styles.emptyBox}>
                         <Package size={28} />
@@ -421,10 +469,7 @@ export default function AdminDashboardPage() {
                     ) : (
                       recentActivity.map((p) => (
                         <div key={p.id} className={styles.activityItem}>
-                          <div
-                            className={styles.activityIcon}
-                            style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
-                          >
+                          <div className={styles.activityIcon}>
                             <Package size={15} />
                           </div>
                           <div className={styles.activityBody}>
@@ -462,7 +507,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {loading ? (
-                <p style={{ color: "#94a3b8" }}>Loading listings…</p>
+                <p className={styles.loadingText}>Loading listings…</p>
               ) : products.length === 0 ? (
                 <div className={styles.emptyBox}>
                   <Package size={36} />
@@ -498,7 +543,7 @@ export default function AdminDashboardPage() {
                                   className={styles.productThumb}
                                   style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
                                 >
-                                  <Package size={18} style={{ color: "#475569" }} />
+                                  <Package size={18} />
                                 </div>
                               )}
                               <div>
@@ -507,10 +552,10 @@ export default function AdminDashboardPage() {
                               </div>
                             </div>
                           </td>
-                          <td style={{ fontWeight: 700, color: "#34d399" }}>
+                          <td className={styles.priceCell}>
                             {formatPrice(p.price)}
                           </td>
-                          <td style={{ color: "#f8fafc" }}>{p.sellerName}</td>
+                          <td className={styles.tableSellerName}>{p.sellerName}</td>
                           <td>{p.location}</td>
                           <td>{statusBadge(p.status, styles)}</td>
                           <td>{formatRelativeTime(p.createdAt)}</td>
@@ -556,7 +601,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {loading ? (
-                <p style={{ color: "#94a3b8" }}>Loading students…</p>
+                <p className={styles.loadingText}>Loading students…</p>
               ) : usersList.length === 0 ? (
                 <div className={styles.emptyBox}>
                   <Users size={36} />
@@ -591,10 +636,10 @@ export default function AdminDashboardPage() {
                           </td>
                           <td>{u.phone ?? "—"}</td>
                           <td>{u.location ?? "Campus"}</td>
-                          <td style={{ color: "#fb923c", fontWeight: 700 }}>
+                          <td className={styles.listingsCount}>
                             {u.activeListings ?? 0}
                           </td>
-                          <td style={{ color: "#34d399", fontWeight: 700 }}>
+                          <td className={styles.soldCount}>
                             {u.soldItems ?? 0}
                           </td>
                           <td>
@@ -629,8 +674,8 @@ export default function AdminDashboardPage() {
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>
-                      <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Megaphone size={18} style={{ color: "#fb923c" }} />
+                      <span className={styles.broadcastHeading}>
+                        <Megaphone size={18} className={styles.broadcastIcon} />
                         Compose Broadcast
                       </span>
                     </h2>
