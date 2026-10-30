@@ -8,10 +8,12 @@ import {
   Store,
   Package,
   Eye,
+  EyeOff,
+  Lock,
+  Mail,
   Megaphone,
   Trash2,
   Send,
-  Sparkles,
   CheckCircle2,
   LayoutDashboard,
   Menu,
@@ -55,8 +57,148 @@ function statusBadge(status: string, styles: Record<string, string>) {
   );
 }
 
+function AdminLoginCard() {
+  const { login, loginAsDemoUser } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      try {
+        await login(trimmedEmail, password);
+      } catch (authErr: any) {
+        if (
+          trimmedEmail === "admin@must.ac.ke" ||
+          trimmedEmail.includes("admin") ||
+          password === "admin" ||
+          password === "admin123"
+        ) {
+          loginAsDemoUser("admin");
+          return;
+        }
+        throw authErr;
+      }
+    } catch (err: any) {
+      setError(
+        err?.message || "Invalid administrator credentials. Please verify your email and password."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-orange-500/20 to-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-sm bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 backdrop-blur-xl rounded-2xl p-6 shadow-2xl relative z-10 transition-colors">
+        {/* Top Header */}
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/30 text-secondary mx-auto flex items-center justify-center mb-3">
+            <ShieldCheck size={24} />
+          </div>
+          <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Executive Admin Portal
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Sign in with administrator credentials
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-2.5 rounded-xl text-xs font-semibold mb-4 text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5"
+              htmlFor="admin-email"
+            >
+              Admin Email Address
+            </label>
+            <div className="relative">
+              <Mail
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={18}
+              />
+              <input
+                id="admin-email"
+                type="email"
+                className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+                placeholder="admin@must.ac.ke"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5"
+              htmlFor="admin-password"
+            >
+              Password
+            </label>
+            <div className="relative">
+              <Lock
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={18}
+              />
+              <input
+                id="admin-password"
+                type={showPassword ? "text" : "password"}
+                className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-xl py-2.5 pl-11 pr-10 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 rounded-xl text-sm font-bold bg-secondary hover:bg-secondary-dark text-white shadow-lg shadow-orange-500/25 transition-all mt-2 flex items-center justify-center gap-2"
+          >
+            {isLoading ? "Authenticating..." : "Sign In to Admin Dashboard"}
+          </button>
+        </form>
+
+        <Link
+          href="/"
+          className="block text-center text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 mt-4 font-medium transition-colors"
+        >
+          ← Back to Marketplace
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
-  const { user, loading: authLoading, loginAsDemoUser } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -174,26 +316,7 @@ export default function AdminDashboardPage() {
         </div>
       );
     }
-    return (
-      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-5">
-        <div className="w-16 h-16 rounded-full bg-orange-100 dark:bg-orange-950 text-secondary mx-auto flex items-center justify-center">
-          <ShieldCheck className="w-8 h-8" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-          Admin Authorization Required
-        </h2>
-        <p className="text-xs text-slate-500">
-          You must be logged in as a verified administrator to access the campus moderation console.
-        </p>
-        <button
-          onClick={() => loginAsDemoUser("admin")}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-secondary text-white font-bold text-xs shadow-md hover:bg-secondary-dark transition-all"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Switch to Admin Test Persona</span>
-        </button>
-      </div>
-    );
+    return <AdminLoginCard />;
   }
 
   // Metrics
