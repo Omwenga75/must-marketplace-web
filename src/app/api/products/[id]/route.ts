@@ -3,6 +3,10 @@ import fs from "fs";
 import path from "path";
 import { Product } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS } from "@/lib/constants";
+import {
+  getFirebaseDeletedProductIds,
+  saveFirebaseDeletedProduct,
+} from "@/lib/firebase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,59 +15,56 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
 const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, "deleted_products.json");
 
-function getDeletedProductIds(): Set<string> {
+function getLocalDeletedIds(): Set<string> {
   try {
-    if (!fs.existsSync(DELETED_PRODUCTS_FILE)) {
-      return new Set();
-    }
+    if (!fs.existsSync(DELETED_PRODUCTS_FILE)) return new Set();
     const raw = fs.readFileSync(DELETED_PRODUCTS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return new Set(parsed.filter(Boolean));
-    }
+    if (Array.isArray(parsed)) return new Set(parsed.filter(Boolean));
   } catch {}
   return new Set();
 }
 
-function saveDeletedProductId(id: string): void {
-  try {
-    if (!id) return;
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const set = getDeletedProductIds();
-    set.add(id);
-    fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...set], null, 2), "utf8");
-  } catch (err) {
-    console.error("Error saving deleted product id:", err);
-  }
+async function getAllDeletedIds(): Promise<Set<string>> {
+  const local = getLocalDeletedIds();
+  const remote = await getFirebaseDeletedProductIds();
+  return new Set([...local, ...remote]);
 }
 
-function getProducts(): Product[] {
-  const deleted = getDeletedProductIds();
+async function persistDeletedId(id: string): Promise<void> {
   try {
-    if (!fs.existsSync(PRODUCTS_FILE)) {
-      return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
-    }
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const set = getLocalDeletedIds();
+    set.add(id);
+    fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...set], null, 2), "utf8");
+  } catch {}
+  await saveFirebaseDeletedProduct(id);
+}
+
+function readAllProducts(): Product[] {
+  try {
+    if (!fs.existsSync(PRODUCTS_FILE)) return [];
     const raw = fs.readFileSync(PRODUCTS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((p) => !deleted.has(p.id))
-      : INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
-  } catch {
-    return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
-  }
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch {}
+  return [];
 }
 
 function saveProducts(products: Product[]): void {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf8");
   } catch (err) {
-    console.error("Error saving products:", err);
+    console.error("saveProducts error:", err);
   }
+}
+
+async function getActiveProducts(): Promise<Product[]> {
+  const deleted = await getAllDeletedIds();
+  const stored = readAllProducts();
+  if (stored.length > 0) return stored.filter((p) => !deleted.has(p.id));
+  return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
 }
 
 export async function GET(
@@ -71,12 +72,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const deleted = getDeletedProductIds();
+  const deleted = await getAllDeletedIds();
   if (deleted.has(id)) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  const products = getProducts();
+  const products = await getActiveProducts();
   const product = products.find((p) => p.id === id);
 
   if (!product) {
@@ -95,19 +96,14 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const products = getProducts();
+    const products = await getActiveProducts();
     const index = products.findIndex((p) => p.id === id);
 
     if (index === -1) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const updated = {
-      ...products[index],
-      ...body,
-      id, // Preserve id
-    };
-
+    const updated = { ...products[index], ...body, id };
     products[index] = updated;
     saveProducts(products);
 
@@ -127,9 +123,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Product ID required" }, { status: 400 });
     }
 
-    saveDeletedProductId(id);
-    const products = getProducts();
-    const filtered = products.filter((p) => p.id !== id);
+    await persistDeletedId(id);
+
+    const allProducts = readAllProducts();
+    const filtered = allProducts.filter((p) => p.id !== id);
     saveProducts(filtered);
 
     return NextResponse.json({ success: true, id }, { status: 200 });

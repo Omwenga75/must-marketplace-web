@@ -3,6 +3,10 @@ import fs from "fs";
 import path from "path";
 import { User, Product } from "@/types";
 import { isAdministratorEmail } from "@/lib/utils";
+import {
+  getFirebaseDeletedUserIds,
+  saveFirebaseDeletedUser,
+} from "@/lib/firebase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,53 +16,58 @@ const USERS_FILE = path.join(DATA_DIR, "users.json");
 const DELETED_USERS_FILE = path.join(DATA_DIR, "deleted_users.json");
 const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
 
-function getDeletedUserIds(): Set<string> {
+// ── Local deleted-IDs helpers ────────────────────────────────────────────────
+
+function getLocalDeletedUserIds(): Set<string> {
   try {
-    if (!fs.existsSync(DELETED_USERS_FILE)) {
-      return new Set();
-    }
+    if (!fs.existsSync(DELETED_USERS_FILE)) return new Set();
     const raw = fs.readFileSync(DELETED_USERS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return new Set(parsed.filter(Boolean));
-    }
+    if (Array.isArray(parsed)) return new Set(parsed.filter(Boolean));
   } catch {}
   return new Set();
 }
 
-function saveDeletedUserId(id: string): void {
+function saveLocalDeletedUserId(id: string): void {
   try {
     if (!id) return;
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const set = getDeletedUserIds();
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const set = getLocalDeletedUserIds();
     set.add(id);
     fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
   } catch (err) {
-    console.error("Error saving deleted user id:", err);
+    console.error("saveLocalDeletedUserId error:", err);
   }
 }
 
-function removeDeletedUserId(id: string): void {
+async function getAllDeletedUserIds(): Promise<Set<string>> {
+  const local = getLocalDeletedUserIds();
+  const remote = await getFirebaseDeletedUserIds();
+  return new Set([...local, ...remote]);
+}
+
+async function persistDeletedUserId(id: string): Promise<void> {
+  saveLocalDeletedUserId(id);
+  await saveFirebaseDeletedUser(id);
+}
+
+function removeLocalDeletedUserId(id: string): void {
   try {
     if (!id) return;
-    const set = getDeletedUserIds();
+    const set = getLocalDeletedUserIds();
     if (set.has(id)) {
       set.delete(id);
       fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
     }
-  } catch (err) {
-    console.error("Error un-deleting user id:", err);
-  }
+  } catch {}
 }
 
-function ensureUsersFile(): User[] {
-  const deleted = getDeletedUserIds();
+// ── Users file helpers ───────────────────────────────────────────────────────
+
+async function ensureUsersFile(): Promise<User[]> {
+  const deleted = await getAllDeletedUserIds();
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(USERS_FILE)) {
       fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf8");
       return [];
@@ -67,7 +76,7 @@ function ensureUsersFile(): User[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    // Filter out all fake emails & deleted users: only allow @gmail.com or admin
+    // Filter: only @gmail.com or admin, and not deleted
     const valid = parsed.filter((u: User) => {
       if (!u || !u.email) return false;
       const email = u.email.toLowerCase().trim();
@@ -81,19 +90,17 @@ function ensureUsersFile(): User[] {
     }
     return valid;
   } catch (err) {
-    console.error("Error reading users file:", err);
+    console.error("ensureUsersFile error:", err);
     return [];
   }
 }
 
 function saveUsersFile(users: User[]): void {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
   } catch (err) {
-    console.error("Error saving users file:", err);
+    console.error("saveUsersFile error:", err);
   }
 }
 
@@ -108,7 +115,6 @@ function getStoredProducts(): Product[] {
   return [];
 }
 
-// Check if user has active listings in products.json
 function userHasListings(user: Partial<User>, products: Product[]): boolean {
   return products.some((p) => {
     if (user.id && (p.sellerId === user.id || p.sellerId === `u_${user.id}`)) return true;
@@ -119,12 +125,14 @@ function userHasListings(user: Partial<User>, products: Product[]): boolean {
   });
 }
 
+// ── Route handlers ───────────────────────────────────────────────────────────
+
 // GET /api/users?email=...&id=...
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const emailParam = searchParams.get("email")?.toLowerCase().trim();
   const idParam = searchParams.get("id") || searchParams.get("uid");
-  const deletedSet = getDeletedUserIds();
+  const deletedSet = await getAllDeletedUserIds();
   const deletedArr = Array.from(deletedSet);
 
   if (searchParams.get("deleted") === "1" || searchParams.get("onlyDeleted") === "1") {
@@ -133,7 +141,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const users = ensureUsersFile();
+  const users = await ensureUsersFile();
   const products = getStoredProducts();
 
   if (emailParam || idParam) {
@@ -148,13 +156,7 @@ export async function GET(req: Request) {
       const isSeller = Boolean(user.seller || user.isSeller || hasListings);
       const isAdmin = Boolean(user.admin || user.isAdmin || isAdministratorEmail(user.email));
       return NextResponse.json(
-        {
-          ...user,
-          seller: isSeller,
-          isSeller: isSeller,
-          admin: isAdmin,
-          isAdmin: isAdmin,
-        },
+        { ...user, seller: isSeller, isSeller, admin: isAdmin, isAdmin },
         {
           headers: {
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -174,13 +176,7 @@ export async function GET(req: Request) {
       const hasListings = userHasListings(u, products);
       const isSeller = Boolean(u.seller || u.isSeller || hasListings);
       const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(u.email));
-      return {
-        ...u,
-        seller: isSeller,
-        isSeller: isSeller,
-        admin: isAdmin,
-        isAdmin: isAdmin,
-      };
+      return { ...u, seller: isSeller, isSeller, admin: isAdmin, isAdmin };
     });
 
   return NextResponse.json(enriched, {
@@ -209,10 +205,10 @@ export async function POST(req: Request) {
       );
     }
 
-    if (id) removeDeletedUserId(id);
-    if (emailLower) removeDeletedUserId(emailLower);
+    if (id) removeLocalDeletedUserId(id);
+    if (emailLower) removeLocalDeletedUserId(emailLower);
 
-    const users = ensureUsersFile();
+    const users = await ensureUsersFile();
     const products = getStoredProducts();
 
     const existingIndex = users.findIndex((u) => {
@@ -226,15 +222,8 @@ export async function POST(req: Request) {
     let updatedUser: User;
     if (existingIndex >= 0) {
       const prev = users[existingIndex];
-      // Keep seller status if previously set or if user has listings
-      const isSeller = Boolean(
-        body.seller ?? body.isSeller ?? prev.seller ?? prev.isSeller ?? hasListings
-      );
-
-      const isAdmin = Boolean(
-        body.admin ?? body.isAdmin ?? prev.admin ?? prev.isAdmin ?? isAdministratorEmail(emailLower)
-      );
-
+      const isSeller = Boolean(body.seller ?? body.isSeller ?? prev.seller ?? prev.isSeller ?? hasListings);
+      const isAdmin = Boolean(body.admin ?? body.isAdmin ?? prev.admin ?? prev.isAdmin ?? isAdministratorEmail(emailLower));
       updatedUser = {
         ...prev,
         ...body,
@@ -244,9 +233,9 @@ export async function POST(req: Request) {
         phone: body.phone ?? prev.phone,
         location: body.location || prev.location || "Main Gate",
         seller: isSeller,
-        isSeller: isSeller,
+        isSeller,
         admin: isAdmin,
-        isAdmin: isAdmin,
+        isAdmin,
       };
       users[existingIndex] = updatedUser;
     } else {
@@ -254,15 +243,15 @@ export async function POST(req: Request) {
       const isAdmin = Boolean(body.admin || body.isAdmin || isAdministratorEmail(emailLower));
       updatedUser = {
         id: id || `u_${Date.now()}`,
-        fullName: body.fullName || "MUST Student",
+        fullName: body.fullName || "MUST User",
         email: emailLower,
         phone: body.phone || null,
         location: body.location || "Main Gate",
         profileImageUrl: body.profileImageUrl || null,
         seller: isSeller,
-        isSeller: isSeller,
+        isSeller,
         admin: isAdmin,
-        isAdmin: isAdmin,
+        isAdmin,
         memberSince: body.memberSince || String(Date.now()),
         activeListings: body.activeListings || (hasListings ? 1 : 0),
         soldItems: body.soldItems || 0,
@@ -272,10 +261,9 @@ export async function POST(req: Request) {
     }
 
     saveUsersFile(users);
-
     return NextResponse.json(updatedUser, { status: 200 });
   } catch (err: any) {
-    console.error("Error saving user:", err);
+    console.error("POST /api/users error:", err);
     return NextResponse.json({ error: err?.message || "Failed to save user" }, { status: 500 });
   }
 }
@@ -298,10 +286,10 @@ export async function PATCH(req: Request) {
       );
     }
 
-    if (id) removeDeletedUserId(id);
-    if (emailLower) removeDeletedUserId(emailLower);
+    if (id) removeLocalDeletedUserId(id);
+    if (emailLower) removeLocalDeletedUserId(emailLower);
 
-    const users = ensureUsersFile();
+    const users = await ensureUsersFile();
     const products = getStoredProducts();
 
     const existingIndex = users.findIndex((u) => {
@@ -315,31 +303,23 @@ export async function PATCH(req: Request) {
     if (existingIndex >= 0) {
       const prev = users[existingIndex];
       const isSeller = isSellerRequested || Boolean(prev.seller || prev.isSeller || userHasListings(prev, products));
-
-      const updatedUser: User = {
-        ...prev,
-        ...body,
-        id: id || prev.id,
-        seller: isSeller,
-        isSeller: isSeller,
-      };
+      const updatedUser: User = { ...prev, ...body, id: id || prev.id, seller: isSeller, isSeller };
       users[existingIndex] = updatedUser;
       saveUsersFile(users);
       return NextResponse.json(updatedUser, { status: 200 });
     }
 
-    // If not found in file yet, create it as seller if requested
     const hasListings = userHasListings(body, products);
     const isSeller = isSellerRequested || hasListings;
     const newUser: User = {
       id: id || `u_${Date.now()}`,
-      fullName: body.fullName || "MUST Student",
+      fullName: body.fullName || "MUST User",
       email: emailLower,
       phone: body.phone || null,
       location: body.location || "Main Gate",
       profileImageUrl: body.profileImageUrl || null,
       seller: isSeller,
-      isSeller: isSeller,
+      isSeller,
       admin: Boolean(body.admin || body.isAdmin),
       isAdmin: Boolean(body.admin || body.isAdmin),
       memberSince: String(Date.now()),
@@ -351,7 +331,7 @@ export async function PATCH(req: Request) {
     saveUsersFile(users);
     return NextResponse.json(newUser, { status: 200 });
   } catch (err: any) {
-    console.error("Error patching user:", err);
+    console.error("PATCH /api/users error:", err);
     return NextResponse.json({ error: err?.message || "Failed to patch user" }, { status: 500 });
   }
 }
@@ -371,27 +351,29 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
     }
 
-    const users = ensureUsersFile();
+    const users = await ensureUsersFile();
     const target = users.find((u) => u.id === id || u.email === id);
-    if (target?.id) saveDeletedUserId(target.id);
-    if (target?.email) saveDeletedUserId(target.email);
-    saveDeletedUserId(id);
+    if (target?.id) await persistDeletedUserId(target.id);
+    if (target?.email) await persistDeletedUserId(target.email);
+    await persistDeletedUserId(id);
 
     const filtered = users.filter((u) => u.id !== id && u.email !== id);
     saveUsersFile(filtered);
 
+    const deletedSet = await getAllDeletedUserIds();
+    const deletedArr = Array.from(deletedSet);
     return NextResponse.json(
-      { success: true, id, deletedIds: Array.from(getDeletedUserIds()) },
+      { success: true, id, deletedIds: deletedArr },
       {
         status: 200,
         headers: {
           "Cache-Control": "no-store, max-age=0",
-          "X-Deleted-Users": JSON.stringify(Array.from(getDeletedUserIds())),
+          "X-Deleted-Users": JSON.stringify(deletedArr),
         },
       }
     );
   } catch (err: any) {
-    console.error("Error deleting user via API:", err);
+    console.error("DELETE /api/users error:", err);
     return NextResponse.json({ error: err?.message || "Failed to delete user" }, { status: 500 });
   }
 }
