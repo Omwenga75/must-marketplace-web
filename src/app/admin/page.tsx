@@ -1016,17 +1016,6 @@ export default function AdminDashboardPage() {
                       : "All caught up · Realtime system audit and event logs"}
                   </p>
                 </div>
-                {unreadAdminNotifsCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={markAllAdminNotifsRead}
-                    className={styles.btnOutline}
-                    style={{ fontSize: "0.8rem", padding: "0.5rem 0.9rem" }}
-                  >
-                    <CheckCircle2 size={15} />
-                    Mark All Read
-                  </button>
-                )}
               </div>
 
               {/* Filter Pills */}
