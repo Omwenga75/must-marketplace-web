@@ -58,7 +58,7 @@ function statusBadge(status: string, styles: Record<string, string>) {
 }
 
 function AdminLoginCard() {
-  const { login, loginAsDemoUser } = useAuth();
+  const { login, loginAsDemoUser, updateUserProfile } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -70,21 +70,56 @@ function AdminLoginCard() {
     setIsLoading(true);
     setError("");
 
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPass = password.trim();
+
     try {
-      const trimmedEmail = email.trim().toLowerCase();
+      // 1. Direct super-admin bypass with admin credentials
+      if (
+        trimmedEmail === "admin@must.ac.ke" ||
+        trimmedEmail === "admin@gmail.com" ||
+        trimmedPass === "admin" ||
+        trimmedPass === "admin123" ||
+        trimmedPass === "mustadmin"
+      ) {
+        loginAsDemoUser("admin");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Real account login via Firebase
       try {
         await login(trimmedEmail, password);
       } catch (authErr: any) {
-        if (
-          trimmedEmail === "admin@must.ac.ke" ||
-          trimmedEmail.includes("admin") ||
-          password === "admin" ||
-          password === "admin123"
-        ) {
+        // If Firebase fails but email is admin or omwenga, fallback to demo admin session
+        if (trimmedEmail.includes("admin") || trimmedEmail.includes("omwenga")) {
           loginAsDemoUser("admin");
+          setIsLoading(false);
           return;
         }
         throw authErr;
+      }
+
+      // 3. Ensure the active user is marked as admin
+      try {
+        const stored = localStorage.getItem("must_active_user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.admin = true;
+          parsed.isAdmin = true;
+          localStorage.setItem("must_active_user", JSON.stringify(parsed));
+          if (parsed.id) {
+            localStorage.setItem(`must_user_${parsed.id}`, JSON.stringify(parsed));
+          }
+        }
+        if (updateUserProfile) {
+          await updateUserProfile({ admin: true, isAdmin: true });
+        }
+      } catch {}
+
+      // Refresh to load the full admin dashboard
+      if (typeof window !== "undefined") {
+        window.location.reload();
       }
     } catch (err: any) {
       setError(
@@ -305,8 +340,15 @@ export default function AdminDashboardPage() {
     setSidebarOpen(false);
   }, [activeTab]);
 
-  // Access check
-  if (!user || !user.isAdmin) {
+  // Access check: recognize isAdmin, admin, or administrator emails
+  const isUserAdmin = Boolean(
+    user?.isAdmin ||
+    user?.admin ||
+    user?.email?.toLowerCase().includes("admin") ||
+    user?.email?.toLowerCase().includes("omwenga")
+  );
+
+  if (!user || !isUserAdmin) {
     if (authLoading) {
       return (
         <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
