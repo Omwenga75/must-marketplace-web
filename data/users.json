@@ -94,5 +94,21 @@
     "activeListings": 0,
     "soldItems": 0,
     "likes": 0
+  },
+  {
+    "id": "eronmuzk_admin",
+    "fullName": "Eron Muzk",
+    "email": "eronmuzk@gmail.com",
+    "phone": "+254 700 000 000",
+    "location": "Administration",
+    "profileImageUrl": null,
+    "seller": true,
+    "isSeller": true,
+    "admin": true,
+    "isAdmin": true,
+    "memberSince": "1729900000000",
+    "activeListings": 0,
+    "soldItems": 0,
+    "likes": 0
   }
 ]

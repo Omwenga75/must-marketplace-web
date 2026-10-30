@@ -35,7 +35,7 @@ import {
   fetchAllUsers,
   sendAdminBroadcast,
 } from "@/lib/firebase/services";
-import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import { formatPrice, formatRelativeTime, isAdministratorEmail } from "@/lib/utils";
 import styles from "./admin.module.css";
 
 type AdminTab = "overview" | "listings" | "students" | "broadcast";
@@ -91,8 +91,8 @@ function AdminLoginCard() {
       try {
         await login(trimmedEmail, password);
       } catch (authErr: any) {
-        // If Firebase fails but email is admin or omwenga, fallback to demo admin session
-        if (trimmedEmail.includes("admin") || trimmedEmail.includes("omwenga")) {
+        // If Firebase fails but email is an authorized administrator, fallback to demo admin session
+        if (isAdministratorEmail(trimmedEmail)) {
           loginAsDemoUser("admin");
           setIsLoading(false);
           return;
@@ -233,7 +233,7 @@ function AdminLoginCard() {
 }
 
 export default function AdminDashboardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
@@ -344,8 +344,7 @@ export default function AdminDashboardPage() {
   const isUserAdmin = Boolean(
     user?.isAdmin ||
     user?.admin ||
-    user?.email?.toLowerCase().includes("admin") ||
-    user?.email?.toLowerCase().includes("omwenga")
+    isAdministratorEmail(user?.email)
   );
 
   if (!user || !isUserAdmin) {
@@ -479,9 +478,21 @@ export default function AdminDashboardPage() {
               {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
-            <Link href="/" className={styles.iconBtn} title="Back to site">
-              <LogOut size={17} />
+            <Link href="/" className={styles.iconBtn} title="View Marketplace">
+              <ExternalLink size={17} />
             </Link>
+
+            <button
+              onClick={async () => {
+                await logout();
+                window.location.reload();
+              }}
+              className={styles.iconBtn}
+              title="Log Out of Admin"
+              aria-label="Log Out of Admin"
+            >
+              <LogOut size={17} />
+            </button>
 
             <div className={styles.profile}>
               <div className={styles.avatar}>

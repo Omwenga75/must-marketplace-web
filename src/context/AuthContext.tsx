@@ -14,6 +14,7 @@ import { ref, get, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase/config";
 import { createNotification } from "@/lib/firebase/services";
 import { User } from "@/types";
+import { isAdministratorEmail } from "@/lib/utils";
 
 interface AuthContextType {
   user: User | null;
@@ -43,16 +44,25 @@ const getInitialCachedUser = (): User | null => {
     const isExplicitLogout = sessionStorage.getItem("must_explicit_logout") === "true";
     if (isExplicitLogout) return null;
 
+    const elevateAdmin = (u: any): User | null => {
+      if (!u) return null;
+      if (isAdministratorEmail(u.email)) {
+        u.admin = true;
+        u.isAdmin = true;
+      }
+      return u as User;
+    };
+
     const demo = localStorage.getItem("must_demo_session");
-    if (demo) return JSON.parse(demo);
+    if (demo) return elevateAdmin(JSON.parse(demo));
 
     const active = localStorage.getItem("must_active_user");
-    if (active) return JSON.parse(active);
+    if (active) return elevateAdmin(JSON.parse(active));
 
     const activeUid = localStorage.getItem("must_active_uid");
     if (activeUid) {
       const cached = localStorage.getItem(`must_user_${activeUid}`);
-      if (cached) return JSON.parse(cached);
+      if (cached) return elevateAdmin(JSON.parse(cached));
     }
   } catch {}
   return null;
@@ -69,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserProfile = async (uid: string, fallbackEmail?: string) => {
     let profile: User | null = null;
     const emailLower = (fallbackEmail || "").toLowerCase().trim();
+    const isEmailAdmin = isAdministratorEmail(emailLower) || isAdministratorEmail(fallbackEmail);
     const savedName = emailLower ? localStorage.getItem(`must_name_for_${emailLower}`) : null;
     const authDisplayName = auth?.currentUser?.displayName;
 
@@ -142,8 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profileImageUrl: val.profileImageUrl || profile?.profileImageUrl || null,
             seller: isSeller,
             isSeller: isSeller,
-            admin: Boolean(val.admin || val.isAdmin || profile?.admin || profile?.isAdmin),
-            isAdmin: Boolean(val.admin || val.isAdmin || profile?.admin || profile?.isAdmin),
+            admin: Boolean(isEmailAdmin || val.admin || val.isAdmin || profile?.admin || profile?.isAdmin),
+            isAdmin: Boolean(isEmailAdmin || val.admin || val.isAdmin || profile?.admin || profile?.isAdmin),
             memberSince: val.memberSince || profile?.memberSince || String(Date.now()),
             activeListings: val.activeListings || profile?.activeListings || 0,
             soldItems: val.soldItems || profile?.soldItems || 0,
@@ -195,8 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileImageUrl: null,
         seller: isKnownSeller,
         isSeller: isKnownSeller,
-        admin: fallbackEmail?.toLowerCase().includes("admin") || fallbackEmail?.toLowerCase().includes("omwenga") || false,
-        isAdmin: fallbackEmail?.toLowerCase().includes("admin") || fallbackEmail?.toLowerCase().includes("omwenga") || false,
+        admin: isEmailAdmin,
+        isAdmin: isEmailAdmin,
         memberSince: String(Date.now()),
         activeListings: isKnownSeller ? 1 : 0,
         soldItems: 0,
@@ -205,6 +216,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (profile) {
+      if (isEmailAdmin) {
+        profile.admin = true;
+        profile.isAdmin = true;
+      }
       // Keep server API synchronized
       if (typeof window !== "undefined") {
         try {
@@ -249,6 +264,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
       setFirebaseUser(fUser);
       if (fUser) {
+        const demo = localStorage.getItem("must_demo_session");
+        if (demo) {
+          try {
+            const parsedDemo = JSON.parse(demo);
+            if (parsedDemo && (parsedDemo.admin || parsedDemo.isAdmin)) {
+              // Active admin session must not be clobbered by background firebase user
+              setLoading(false);
+              return;
+            }
+          } catch {}
+        }
         localStorage.setItem("must_active_uid", fUser.uid);
         await fetchUserProfile(fUser.uid, fUser.email || "");
       } else {
@@ -316,8 +342,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileImageUrl: null,
       seller: isSeller,
       isSeller: isSeller,
-      admin: trimmedEmail.includes("admin") || trimmedEmail.includes("omwenga"),
-      isAdmin: trimmedEmail.includes("admin") || trimmedEmail.includes("omwenga"),
+      admin: isAdministratorEmail(trimmedEmail),
+      isAdmin: isAdministratorEmail(trimmedEmail),
       memberSince: String(Date.now()),
       activeListings: 0,
       soldItems: 0,

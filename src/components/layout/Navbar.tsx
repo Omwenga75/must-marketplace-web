@@ -24,12 +24,19 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { subscribeToConversations, subscribeToNotifications } from "@/lib/firebase/services";
+import { isAdministratorEmail } from "@/lib/utils";
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, logout } = useAuth();
   const { favoriteIds } = useFavorites();
+
+  const isUserAdmin = Boolean(
+    user?.isAdmin ||
+    user?.admin ||
+    isAdministratorEmail(user?.email)
+  );
 
   const isMarketplace = pathname?.startsWith("/marketplace");
 
@@ -339,7 +346,7 @@ export default function Navbar() {
                         {user.email}
                       </p>
                       <div className="mt-1 flex gap-1">
-                        {user.isAdmin || user.admin ? (
+                        {isUserAdmin ? (
                           <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-orange-100 dark:bg-orange-950/60 text-secondary">
                             Administrator
                           </span>
@@ -351,7 +358,7 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {user.isAdmin || user.admin ? (
+                    {isUserAdmin ? (
                       <>
                         <Link
                           href="/admin"
@@ -515,7 +522,7 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  {user.isAdmin || user.admin ? (
+                  {isUserAdmin ? (
                     <Link
                       href="/admin"
                       onClick={() => setMobileMenuOpen(false)}

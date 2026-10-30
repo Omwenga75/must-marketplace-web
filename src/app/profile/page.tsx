@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { UNIVERSITY_LOCATIONS } from "@/lib/constants";
-import { formatDate } from "@/lib/utils";
+import { formatDate, isAdministratorEmail } from "@/lib/utils";
 import { update } from "firebase/database";
 import { ref } from "firebase/database";
 import { database } from "@/lib/firebase/config";
@@ -28,6 +28,12 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading, logout, updateUserProfile } = useAuth();
   const { favoriteIds } = useFavorites();
+
+  const isUserAdmin = Boolean(
+    user?.isAdmin ||
+    user?.admin ||
+    isAdministratorEmail(user?.email)
+  );
 
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user?.fullName || "");
@@ -115,12 +121,13 @@ export default function ProfilePage() {
                 {user.fullName}
               </h1>
               <div className="flex items-center justify-center sm:justify-start gap-1.5">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  {user.isSeller ? "Buyer · Seller" : "Buyer"}
-                </span>
-                {user.isAdmin && (
+                {isUserAdmin ? (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 dark:bg-orange-950 text-secondary">
-                    Admin
+                    Administrator
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {user.isSeller ? "Buyer · Seller" : "Buyer"}
                   </span>
                 )}
               </div>
@@ -237,8 +244,26 @@ export default function ProfilePage() {
 
       {/* Account Shortcuts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Seller Status Card */}
-        {user.isSeller ? (
+        {/* Admin or Seller Status Card */}
+        {isUserAdmin ? (
+          <Link
+            href="/admin"
+            className="p-6 rounded-3xl bg-orange-50/70 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800 hover:border-secondary transition-all flex items-center justify-between group"
+          >
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-secondary" />
+                <span>Executive Management</span>
+              </p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Admin Portal
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Access executive controls, manage listings, students & broadcasts
+              </p>
+            </div>
+          </Link>
+        ) : user.isSeller ? (
           <Link
             href="/seller/dashboard"
             className="p-6 rounded-3xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800 hover:border-emerald-500 transition-all flex items-center justify-between group"

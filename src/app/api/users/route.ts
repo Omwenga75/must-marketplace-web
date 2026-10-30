@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { User, Product } from "@/types";
+import { isAdministratorEmail } from "@/lib/utils";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
@@ -77,11 +78,14 @@ export async function GET(req: Request) {
     if (user) {
       const hasListings = userHasListings(user, products);
       const isSeller = Boolean(user.seller || user.isSeller || hasListings);
+      const isAdmin = Boolean(user.admin || user.isAdmin || isAdministratorEmail(user.email));
       return NextResponse.json(
         {
           ...user,
           seller: isSeller,
           isSeller: isSeller,
+          admin: isAdmin,
+          isAdmin: isAdmin,
         },
         {
           headers: { "Cache-Control": "no-store, max-age=0" },
@@ -96,10 +100,13 @@ export async function GET(req: Request) {
   const enriched = users.map((u) => {
     const hasListings = userHasListings(u, products);
     const isSeller = Boolean(u.seller || u.isSeller || hasListings);
+    const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(u.email));
     return {
       ...u,
       seller: isSeller,
       isSeller: isSeller,
+      admin: isAdmin,
+      isAdmin: isAdmin,
     };
   });
 
@@ -138,6 +145,10 @@ export async function POST(req: Request) {
         body.seller ?? body.isSeller ?? prev.seller ?? prev.isSeller ?? hasListings
       );
 
+      const isAdmin = Boolean(
+        body.admin ?? body.isAdmin ?? prev.admin ?? prev.isAdmin ?? isAdministratorEmail(emailLower)
+      );
+
       updatedUser = {
         ...prev,
         ...body,
@@ -148,12 +159,13 @@ export async function POST(req: Request) {
         location: body.location || prev.location || "Main Gate",
         seller: isSeller,
         isSeller: isSeller,
-        admin: Boolean(body.admin ?? body.isAdmin ?? prev.admin ?? prev.isAdmin),
-        isAdmin: Boolean(body.admin ?? body.isAdmin ?? prev.admin ?? prev.isAdmin),
+        admin: isAdmin,
+        isAdmin: isAdmin,
       };
       users[existingIndex] = updatedUser;
     } else {
       const isSeller = Boolean(body.seller || body.isSeller || hasListings);
+      const isAdmin = Boolean(body.admin || body.isAdmin || isAdministratorEmail(emailLower));
       updatedUser = {
         id: id || `u_${Date.now()}`,
         fullName: body.fullName || "MUST Student",
@@ -163,8 +175,8 @@ export async function POST(req: Request) {
         profileImageUrl: body.profileImageUrl || null,
         seller: isSeller,
         isSeller: isSeller,
-        admin: Boolean(body.admin || body.isAdmin),
-        isAdmin: Boolean(body.admin || body.isAdmin),
+        admin: isAdmin,
+        isAdmin: isAdmin,
         memberSince: body.memberSince || String(Date.now()),
         activeListings: body.activeListings || (hasListings ? 1 : 0),
         soldItems: body.soldItems || 0,

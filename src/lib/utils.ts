@@ -135,3 +135,15 @@ export function getInitials(name: string): string {
     .join("")
     .toUpperCase();
 }
+
+/** Check if an email has administrator privileges */
+export function isAdministratorEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  return (
+    lower.includes("admin") ||
+    lower.includes("omwenga") ||
+    lower.includes("eronmuzk") ||
+    lower === "eronmuzk@gmail.com"
+  );
+}
