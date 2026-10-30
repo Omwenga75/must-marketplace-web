@@ -10,21 +10,49 @@ import {
   Eye,
   Megaphone,
   Trash2,
-  CheckCircle2,
-  AlertTriangle,
   Send,
   Sparkles,
+  CheckCircle2,
+  LayoutDashboard,
+  Menu,
+  X,
+  ArrowRight,
+  TrendingUp,
+  Heart,
+  ExternalLink,
+  Activity,
+  Plus,
+  LogOut,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Product, User } from "@/types";
 import {
   fetchProducts,
   deleteProduct,
-  updateProduct,
   fetchAllUsers,
   sendAdminBroadcast,
 } from "@/lib/firebase/services";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import styles from "./admin.module.css";
+
+type AdminTab = "overview" | "listings" | "students" | "broadcast";
+
+const NAV_ITEMS: { label: string; tab: AdminTab; icon: React.ElementType }[] = [
+  { label: "Dashboard",  tab: "overview",   icon: LayoutDashboard },
+  { label: "Listings",   tab: "listings",   icon: Package },
+  { label: "Students",   tab: "students",   icon: Users },
+  { label: "Broadcast",  tab: "broadcast",  icon: Megaphone },
+];
+
+function statusBadge(status: string, styles: Record<string, string>) {
+  if (status === "ACTIVE")
+    return <span className={styles.badgeActive}>Active</span>;
+  if (status === "SOLD")
+    return <span className={styles.badgeSold}>Sold</span>;
+  return (
+    <span className={styles.badgeSold}>{status}</span>
+  );
+}
 
 export default function AdminDashboardPage() {
   const { user, loading: authLoading, loginAsDemoUser } = useAuth();
@@ -32,9 +60,8 @@ export default function AdminDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "users" | "broadcast">(
-    "overview"
-  );
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Broadcast state
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -49,7 +76,6 @@ export default function AdminDashboardPage() {
         if (users.length > 0) {
           setUsersList(users);
         } else {
-          // Demo users
           setUsersList([
             {
               id: "u1",
@@ -96,6 +122,11 @@ export default function AdminDashboardPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  // Close sidebar on tab change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [activeTab]);
+
   // Access check
   if (!user || !user.isAdmin) {
     if (authLoading) {
@@ -130,11 +161,16 @@ export default function AdminDashboardPage() {
   }
 
   // Metrics
-  const totalListings = products.length;
-  const activeListings = products.filter((p) => p.status === "ACTIVE").length;
-  const totalViews = products.reduce((sum, p) => sum + (p.views || 0), 0);
-  const totalLikes = products.reduce((sum, p) => sum + (p.likes || 0), 0);
-  const sellerCount = usersList.filter((u) => u.isSeller || u.seller).length;
+  const totalListings   = products.length;
+  const activeListings  = products.filter((p) => p.status === "ACTIVE").length;
+  const totalViews      = products.reduce((s, p) => s + (p.views || 0), 0);
+  const totalLikes      = products.reduce((s, p) => s + (p.likes || 0), 0);
+  const sellerCount     = usersList.filter((u) => u.isSeller || u.seller).length;
+
+  // Recent activity — last 5 products
+  const recentActivity = [...products]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
 
   const handleDelete = async (productId: string) => {
     if (confirm("Admin: Permanently delete this listing?")) {
@@ -147,13 +183,12 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!broadcastTitle || !broadcastMessage) return;
     setBroadcastSending(true);
-
     try {
       await sendAdminBroadcast(broadcastTitle, broadcastMessage, "NORMAL");
       setBroadcastSuccess(true);
       setBroadcastTitle("");
       setBroadcastMessage("");
-      setTimeout(() => setBroadcastSuccess(false), 3000);
+      setTimeout(() => setBroadcastSuccess(false), 4000);
     } catch (err) {
       console.warn(err);
     } finally {
@@ -162,270 +197,493 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              <ShieldCheck className="w-7 h-7 text-secondary" />
-              <span>MUST Admin Console</span>
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950 text-secondary font-bold text-xs">
-              Super Admin
-            </span>
+    <div className={styles.layout}>
+      {/* ── Mobile Overlay ── */}
+      {sidebarOpen && (
+        <div
+          className={styles.overlay}
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar"
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.logoBadge}>M</div>
+          <div>
+            <div className={styles.brandName}>MUST Admin</div>
+            <div className={styles.brandSub}>Marketplace Portal</div>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Moderation, student verification, platform metrics, and university broadcasts
-          </p>
+          <button
+            className={styles.closeSidebarBtn}
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl overflow-x-auto text-xs font-bold">
-          {(["overview", "products", "users", "broadcast"] as const).map((tab) => (
+        <nav className={styles.nav}>
+          {NAV_ITEMS.map(({ label, tab, icon: Icon }) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3.5 py-2 rounded-xl capitalize transition-all ${
-                activeTab === tab
-                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900"
-              }`}
+              className={`${styles.navLink} ${activeTab === tab ? styles.navLinkActive : ""}`}
             >
-              {tab}
+              <span className={styles.navIcon}><Icon size={18} /></span>
+              <span>{label}</span>
             </button>
           ))}
-        </div>
-      </div>
 
-      {/* ── TAB 1: OVERVIEW & ANALYTICS ─────────────────────────────────── */}
-      {activeTab === "overview" && (
-        <div className="space-y-8 animate-fade-in">
-          {/* Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Listings</span>
-                <Package className="w-4 h-4 text-emerald-600" />
-              </div>
-              <p className="text-3xl font-black text-slate-900 dark:text-white">
-                {totalListings}
-              </p>
-              <p className="text-[11px] text-emerald-600 font-semibold">
-                {activeListings} active on campus
-              </p>
-            </div>
+          <div className={styles.navDivider} />
 
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-bold uppercase tracking-wider">Verified Sellers</span>
-                <Store className="w-4 h-4 text-secondary" />
-              </div>
-              <p className="text-3xl font-black text-slate-900 dark:text-white">
-                {sellerCount}
-              </p>
-              <p className="text-[11px] text-slate-500">Students with seller role</p>
-            </div>
+          <Link href="/marketplace" className={styles.navLink}>
+            <span className={styles.navIcon}><Store size={18} /></span>
+            <span>View Marketplace</span>
+          </Link>
 
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Views</span>
-                <Eye className="w-4 h-4 text-blue-500" />
-              </div>
-              <p className="text-3xl font-black text-slate-900 dark:text-white">{totalViews}</p>
-              <p className="text-[11px] text-slate-500">Student ad impressions</p>
-            </div>
+          <Link href="/seller/products/new" className={styles.navLink}>
+            <span className={styles.navIcon}><Plus size={18} /></span>
+            <span>Add Listing</span>
+          </Link>
+        </nav>
+      </aside>
 
-            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-bold uppercase tracking-wider">Total Likes</span>
-                <Users className="w-4 h-4 text-rose-500" />
-              </div>
-              <p className="text-3xl font-black text-slate-900 dark:text-white">{totalLikes}</p>
-              <p className="text-[11px] text-slate-500">Comrade bookmarks</p>
-            </div>
-          </div>
-
-          {/* Quick moderation prompt */}
-          <div className="p-6 rounded-3xl bg-primary/30 dark:bg-emerald-950/20 border border-primary-container dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Campus Broadcast Ready
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                Send official alerts, safety guidelines or platform announcements to all student users.
-              </p>
-            </div>
+      {/* ── Main Content ── */}
+      <main className={styles.mainContent}>
+        {/* Top Bar */}
+        <header className={styles.topbar}>
+          <div className={styles.topbarLeft}>
             <button
-              onClick={() => setActiveTab("broadcast")}
-              className="px-4 py-2.5 rounded-xl bg-secondary text-white font-bold text-xs shadow-sm shrink-0"
+              className={styles.mobileMenuBtn}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open navigation"
             >
-              Compose Broadcast
+              <Menu size={20} />
             </button>
+            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#f8fafc" }}>
+              {NAV_ITEMS.find((n) => n.tab === activeTab)?.label ?? "Admin"}
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* ── TAB 2: PRODUCT MANAGEMENT ───────────────────────────────────── */}
-      {activeTab === "products" && (
-        <div className="space-y-4 animate-fade-in">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-            All Campus Listings ({products.length})
-          </h2>
-
-          <div className="space-y-3">
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <img
-                    src={p.imageUrls[0]}
-                    alt=""
-                    className="w-14 h-14 rounded-xl object-cover bg-slate-100 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                      {p.title}
-                    </h4>
-                    <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                      {formatPrice(p.price)}
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Seller: {p.sellerName} • {p.location} • {p.status}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    href={`/product/${p.id}`}
-                    target="_blank"
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold"
-                  >
-                    View
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="p-2 rounded-lg text-rose-500 hover:bg-rose-50"
-                    title="Remove listing"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+          <div className={styles.topbarActions}>
+            <Link href="/" className={styles.iconBtn} title="Back to site">
+              <LogOut size={17} />
+            </Link>
+            <div className={styles.profile}>
+              <div className={styles.avatar}>
+                {user?.fullName?.[0]?.toUpperCase() ?? "A"}
               </div>
-            ))}
+              <div className={styles.profileInfo}>
+                <span className={styles.profileName}>{user?.fullName ?? "Admin"}</span>
+                <span className={styles.profileRole}>Super Admin</span>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        </header>
 
-      {/* ── TAB 3: USER MANAGEMENT ──────────────────────────────────────── */}
-      {activeTab === "users" && (
-        <div className="space-y-4 animate-fade-in">
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-            Student Accounts ({usersList.length})
-          </h2>
+        {/* Page Content */}
+        <div className={styles.pageContainer}>
 
-          <div className="space-y-3">
-            {usersList.map((u) => (
-              <div
-                key={u.id}
-                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-full bg-primary-container text-primary-dark font-black flex items-center justify-center shrink-0">
-                    {u.fullName.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                      {u.fullName}
-                    </h4>
-                    <p className="text-xs text-slate-500 truncate">{u.email}</p>
-                    <p className="text-[11px] text-slate-400">
-                      Role: {u.isSeller || u.seller ? "Seller" : "Buyer"} • {u.location || "Campus"}
-                    </p>
-                  </div>
+          {/* ── TAB: OVERVIEW ───────────────────────────────────────── */}
+          {activeTab === "overview" && (
+            <>
+              <div className={styles.pageHeader}>
+                <div>
+                  <h1 className={styles.pageTitle}>Admin Overview</h1>
+                  <p className={styles.pageSubtitle}>
+                    Platform metrics, quick actions, and recent activity
+                  </p>
                 </div>
-
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    u.isSeller || u.seller
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  }`}
+                <button
+                  onClick={() => setActiveTab("broadcast")}
+                  className={styles.btnPrimary}
                 >
-                  {u.isSeller || u.seller ? "Verified Seller" : "Student"}
-                </span>
+                  <Megaphone size={15} />
+                  Broadcast
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ── TAB 4: CAMPUS BROADCAST ─────────────────────────────────────── */}
-      {activeTab === "broadcast" && (
-        <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-          <div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-secondary" />
-              <span>Campus-Wide Broadcast</span>
-            </h2>
-            <p className="text-xs text-slate-500">
-              Send an instant push notification and in-app alert to all registered students.
-            </p>
-          </div>
+              {/* Stat Cards */}
+              <div className={styles.statsGrid}>
+                <div className={styles.statCard}>
+                  <div className={styles.statIcon}>
+                    <Package size={22} />
+                  </div>
+                  <div className={styles.statInfo}>
+                    <h3>Total Listings</h3>
+                    <p>{loading ? "—" : totalListings}</p>
+                    <small>{activeListings} active</small>
+                  </div>
+                </div>
 
-          <form
-            onSubmit={handleSendBroadcast}
-            className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4 shadow-card"
-          >
-            {broadcastSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Broadcast successfully dispatched to all student accounts!</span>
+                <div className={styles.statCard}>
+                  <div className={styles.statIcon} style={{ background: "rgba(59,130,246,0.12)", color: "#60a5fa" }}>
+                    <TrendingUp size={22} />
+                  </div>
+                  <div className={styles.statInfo}>
+                    <h3>Active Listings</h3>
+                    <p>{loading ? "—" : activeListings}</p>
+                    <small>currently on market</small>
+                  </div>
+                </div>
+
+                <div className={styles.statCard}>
+                  <div className={styles.statIcon} style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}>
+                    <Store size={22} />
+                  </div>
+                  <div className={styles.statInfo}>
+                    <h3>Sellers</h3>
+                    <p>{loading ? "—" : sellerCount}</p>
+                    <small>verified accounts</small>
+                  </div>
+                </div>
+
+                <div className={styles.statCard}>
+                  <div className={styles.statIcon} style={{ background: "rgba(96,165,250,0.12)", color: "#93c5fd" }}>
+                    <Eye size={22} />
+                  </div>
+                  <div className={styles.statInfo}>
+                    <h3>Total Views</h3>
+                    <p>{loading ? "—" : totalViews.toLocaleString()}</p>
+                    <small>ad impressions</small>
+                  </div>
+                </div>
+
+                <div className={styles.statCard}>
+                  <div className={styles.statIcon} style={{ background: "rgba(244,114,182,0.12)", color: "#f472b6" }}>
+                    <Heart size={22} />
+                  </div>
+                  <div className={styles.statInfo}>
+                    <h3>Total Likes</h3>
+                    <p>{loading ? "—" : totalLikes.toLocaleString()}</p>
+                    <small>student bookmarks</small>
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Broadcast Title
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. End of Semester Textbook Drive or Safety Reminder"
-                value={broadcastTitle}
-                onChange={(e) => setBroadcastTitle(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
-              />
-            </div>
+              {/* 2-Col: Quick Actions + Recent Activity */}
+              <div className={styles.grid2Col}>
+                {/* Quick Actions */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h2 className={styles.cardTitle}>Quick Actions</h2>
+                    <ArrowRight size={16} style={{ color: "#64748b" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                    <button
+                      onClick={() => setActiveTab("listings")}
+                      className={styles.btnOutline}
+                    >
+                      <span>Manage All Listings</span>
+                      <Package size={15} />
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("students")}
+                      className={styles.btnOutline}
+                    >
+                      <span>Manage Students</span>
+                      <Users size={15} />
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("broadcast")}
+                      className={styles.btnOutline}
+                    >
+                      <span>Send Campus Broadcast</span>
+                      <Megaphone size={15} />
+                    </button>
+                    <Link href="/seller/products/new" className={styles.btnOutline}>
+                      <span>Add New Listing</span>
+                      <Plus size={15} />
+                    </Link>
+                    <Link href="/marketplace" className={styles.btnOutline}>
+                      <span>View Marketplace</span>
+                      <ExternalLink size={15} />
+                    </Link>
+                  </div>
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Message Body
-              </label>
-              <textarea
-                rows={4}
-                required
-                placeholder="Enter announcement details..."
-                value={broadcastMessage}
-                onChange={(e) => setBroadcastMessage(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
-              />
-            </div>
+                {/* Recent Activity */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h2 className={styles.cardTitle}>Recent Listings</h2>
+                    <Activity size={16} style={{ color: "#fb923c" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    {loading ? (
+                      <p style={{ color: "#64748b", fontSize: "0.85rem" }}>Loading…</p>
+                    ) : recentActivity.length === 0 ? (
+                      <div className={styles.emptyBox}>
+                        <Package size={28} />
+                        <p>No listings yet</p>
+                      </div>
+                    ) : (
+                      recentActivity.map((p) => (
+                        <div key={p.id} className={styles.activityItem}>
+                          <div
+                            className={styles.activityIcon}
+                            style={{ background: "rgba(249,115,22,0.12)", color: "#fb923c" }}
+                          >
+                            <Package size={15} />
+                          </div>
+                          <div className={styles.activityBody}>
+                            <div className={styles.activityTitle}>{p.title}</div>
+                            <div className={styles.activitySub}>
+                              {formatPrice(p.price)} · {p.sellerName} · {p.status}
+                            </div>
+                          </div>
+                          <span className={styles.activityTime}>
+                            {formatRelativeTime(p.createdAt)}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
-            <button
-              type="submit"
-              disabled={broadcastSending}
-              className="w-full py-3.5 rounded-xl bg-secondary hover:bg-secondary-dark disabled:opacity-50 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              <span>{broadcastSending ? "Dispatching..." : "Send Broadcast to Comrades"}</span>
-            </button>
-          </form>
+          {/* ── TAB: LISTINGS ───────────────────────────────────────── */}
+          {activeTab === "listings" && (
+            <>
+              <div className={styles.pageHeader}>
+                <div>
+                  <h1 className={styles.pageTitle}>All Listings</h1>
+                  <p className={styles.pageSubtitle}>
+                    {loading ? "Loading…" : `${totalListings} total · ${activeListings} active`}
+                  </p>
+                </div>
+                <Link href="/seller/products/new" className={styles.btnPrimary}>
+                  <Plus size={15} />
+                  Add Listing
+                </Link>
+              </div>
+
+              {loading ? (
+                <p style={{ color: "#94a3b8" }}>Loading listings…</p>
+              ) : products.length === 0 ? (
+                <div className={styles.emptyBox}>
+                  <Package size={36} />
+                  <p>No listings found on the platform</p>
+                </div>
+              ) : (
+                <div className={styles.tableWrapper}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Price</th>
+                        <th>Seller</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Posted</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {products.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className={styles.productCell}>
+                              {p.imageUrls?.[0] ? (
+                                <img
+                                  src={p.imageUrls[0]}
+                                  alt=""
+                                  className={styles.productThumb}
+                                />
+                              ) : (
+                                <div
+                                  className={styles.productThumb}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
+                                >
+                                  <Package size={18} style={{ color: "#475569" }} />
+                                </div>
+                              )}
+                              <div>
+                                <div className={styles.productName}>{p.title}</div>
+                                <div className={styles.productMeta}>{p.category?.name}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ fontWeight: 700, color: "#34d399" }}>
+                            {formatPrice(p.price)}
+                          </td>
+                          <td style={{ color: "#f8fafc" }}>{p.sellerName}</td>
+                          <td>{p.location}</td>
+                          <td>{statusBadge(p.status, styles)}</td>
+                          <td>{formatRelativeTime(p.createdAt)}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              <Link
+                                href={`/product/${p.id}`}
+                                target="_blank"
+                                className={styles.btnView}
+                              >
+                                <Eye size={13} />
+                                View
+                              </Link>
+                              <button
+                                onClick={() => handleDelete(p.id)}
+                                className={styles.btnDanger}
+                                title="Delete listing"
+                              >
+                                <Trash2 size={13} />
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── TAB: STUDENTS ───────────────────────────────────────── */}
+          {activeTab === "students" && (
+            <>
+              <div className={styles.pageHeader}>
+                <div>
+                  <h1 className={styles.pageTitle}>Student Accounts</h1>
+                  <p className={styles.pageSubtitle}>
+                    {loading ? "Loading…" : `${usersList.length} registered · ${sellerCount} sellers`}
+                  </p>
+                </div>
+              </div>
+
+              {loading ? (
+                <p style={{ color: "#94a3b8" }}>Loading students…</p>
+              ) : usersList.length === 0 ? (
+                <div className={styles.emptyBox}>
+                  <Users size={36} />
+                  <p>No student accounts yet</p>
+                </div>
+              ) : (
+                <div className={styles.tableWrapper}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Phone</th>
+                        <th>Location</th>
+                        <th>Listings</th>
+                        <th>Sold</th>
+                        <th>Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersList.map((u) => (
+                        <tr key={u.id}>
+                          <td>
+                            <div className={styles.userCell}>
+                              <div className={styles.userAvatar}>
+                                {u.fullName?.[0]?.toUpperCase() ?? "?"}
+                              </div>
+                              <div>
+                                <div className={styles.userName}>{u.fullName}</div>
+                                <div className={styles.userEmail}>{u.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{u.phone ?? "—"}</td>
+                          <td>{u.location ?? "Campus"}</td>
+                          <td style={{ color: "#fb923c", fontWeight: 700 }}>
+                            {u.activeListings ?? 0}
+                          </td>
+                          <td style={{ color: "#34d399", fontWeight: 700 }}>
+                            {u.soldItems ?? 0}
+                          </td>
+                          <td>
+                            {u.isSeller || u.seller ? (
+                              <span className={styles.badgeSeller}>Seller</span>
+                            ) : (
+                              <span className={styles.badgeStudent}>Student</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── TAB: BROADCAST ──────────────────────────────────────── */}
+          {activeTab === "broadcast" && (
+            <>
+              <div className={styles.pageHeader}>
+                <div>
+                  <h1 className={styles.pageTitle}>Campus Broadcast</h1>
+                  <p className={styles.pageSubtitle}>
+                    Send instant alerts and announcements to all registered students
+                  </p>
+                </div>
+              </div>
+
+              <div className={styles.broadcastWrap}>
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h2 className={styles.cardTitle}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Megaphone size={18} style={{ color: "#fb923c" }} />
+                        Compose Broadcast
+                      </span>
+                    </h2>
+                  </div>
+
+                  {broadcastSuccess && (
+                    <div className={styles.successBanner}>
+                      <CheckCircle2 size={16} />
+                      <span>Broadcast successfully dispatched to all student accounts!</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSendBroadcast}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Broadcast Title</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. End of Semester Textbook Drive"
+                        value={broadcastTitle}
+                        onChange={(e) => setBroadcastTitle(e.target.value)}
+                        className={styles.formInput}
+                      />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Message Body</label>
+                      <textarea
+                        rows={5}
+                        required
+                        placeholder="Enter announcement details…"
+                        value={broadcastMessage}
+                        onChange={(e) => setBroadcastMessage(e.target.value)}
+                        className={`${styles.formInput} ${styles.formTextarea}`}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={broadcastSending}
+                      className={styles.btnPrimary}
+                      style={{ width: "100%", justifyContent: "center", padding: "0.9rem" }}
+                    >
+                      <Send size={16} />
+                      {broadcastSending ? "Dispatching…" : "Send to All Students"}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 }
