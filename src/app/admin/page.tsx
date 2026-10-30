@@ -347,45 +347,18 @@ export default function AdminDashboardPage() {
     isAdministratorEmail(user?.email)
   );
 
-  if (!user || !isUserAdmin) {
-    if (authLoading) {
-      return (
-        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
-          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
-        </div>
-      );
-    }
-    return <AdminLoginCard />;
-  }
-
-  // Metrics
-  const totalListings   = products.length;
-  const activeListings  = products.filter((p) => p.status === "ACTIVE").length;
-  const totalViews      = products.reduce((s, p) => s + (p.views || 0), 0);
-  const totalLikes      = products.reduce((s, p) => s + (p.likes || 0), 0);
-  // Filter out all admin accounts so only student comrades & sellers are shown in users list
-  const nonAdminUsers   = usersList.filter(
+  // ── All derived data & memos MUST be computed before any early returns ──
+  // Filter out admin accounts: only real student/seller accounts shown in Users tab
+  const nonAdminUsers = usersList.filter(
     (u) =>
       !u.admin &&
       !u.isAdmin &&
       !isAdministratorEmail(u.email) &&
       u.email?.toLowerCase().trim() !== "must.market@admin.com"
   );
-  const sellerCount     = nonAdminUsers.filter(
-    (u) =>
-      u.isSeller ||
-      u.seller ||
-      products.some((p) => p.sellerId === u.id || (u.phone && p.sellerPhone === u.phone))
-  ).length;
-
-  // Recent activity — last 2 products
-  const recentActivity = [...products]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 2);
 
   // Administrative notifications feed (System, User, Listing, and Broadcast events)
+  // useMemo is a hook and MUST be here, before the early auth-guard returns below
   const adminNotifications = useMemo(() => {
     const list: {
       id: string;
@@ -406,7 +379,7 @@ export default function AdminDashboardPage() {
               list.push({
                 id: `bcast_${b.timestamp}`,
                 title: `Broadcast Dispatched: ${b.title}`,
-                message: b.message || "Dispatched announcement to all student accounts.",
+                message: b.message || "Dispatched announcement to all user accounts.",
                 category: "broadcast",
                 timestamp: b.timestamp,
               });
@@ -432,7 +405,7 @@ export default function AdminDashboardPage() {
       list.push({
         id: `prod_${p.id}`,
         title: `Listing Posted: ${p.title}`,
-        message: `KSh ${Number(p.price || 0).toLocaleString()} · ${p.category || "General"} · Location: ${p.location}`,
+        message: `KSh ${Number(p.price || 0).toLocaleString()} · ${typeof p.category === "object" ? p.category?.name : p.category || "General"} · Location: ${p.location}`,
         category: "listing",
         timestamp: new Date(p.createdAt || 0).getTime() || Date.now(),
       });
@@ -452,6 +425,37 @@ export default function AdminDashboardPage() {
   }, [nonAdminUsers, products]);
 
   const unreadAdminNotifsCount = adminNotifications.filter((n) => !readAdminNotifIds.has(n.id)).length;
+
+  // ── Early returns (auth guard) — all hooks are above this point ──
+  if (!user || !isUserAdmin) {
+    if (authLoading) {
+      return (
+        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
+          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
+          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
+          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        </div>
+      );
+    }
+    return <AdminLoginCard />;
+  }
+
+  // Metrics
+  const totalListings   = products.length;
+  const activeListings  = products.filter((p) => p.status === "ACTIVE").length;
+  const totalViews      = products.reduce((s, p) => s + (p.views || 0), 0);
+  const totalLikes      = products.reduce((s, p) => s + (p.likes || 0), 0);
+  const sellerCount     = nonAdminUsers.filter(
+    (u) =>
+      u.isSeller ||
+      u.seller ||
+      products.some((p) => p.sellerId === u.id || (u.phone && p.sellerPhone === u.phone))
+  ).length;
+
+  // Recent activity — last 2 products
+  const recentActivity = [...products]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 2);
 
   const markAllAdminNotifsRead = () => {
     const allIds = new Set(adminNotifications.map((n) => n.id));
