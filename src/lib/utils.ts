@@ -141,9 +141,11 @@ export function isAdministratorEmail(email?: string | null): boolean {
   if (!email) return false;
   const lower = email.toLowerCase().trim();
   return (
+    lower === "must.market@admin.com" ||
+    lower.includes("must.market@admin") ||
+    lower === "eronmuzk@gmail.com" ||
     lower.includes("admin") ||
     lower.includes("omwenga") ||
-    lower.includes("eronmuzk") ||
-    lower === "eronmuzk@gmail.com"
+    lower.includes("eronmuzk")
   );
 }

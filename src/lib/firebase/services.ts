@@ -1797,7 +1797,12 @@ export async function fetchAllUsers(): Promise<User[]> {
         const data = await res.json();
         if (Array.isArray(data)) {
           return data
-            .filter((u: User) => !deleted.has(u.id) && !deleted.has(u.email))
+            .filter((u: User) => {
+              if (deleted.has(u.id) || deleted.has(u.email)) return false;
+              const email = (u.email || "").toLowerCase().trim();
+              if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
+              return email.endsWith("@gmail.com") || email === "must.market@admin.com";
+            })
             .map((u: User) => ({
               ...u,
               fullName: u.fullName || "User",
@@ -1816,7 +1821,12 @@ export async function fetchAllUsers(): Promise<User[]> {
       if (snap.exists()) {
         const val = snap.val();
         return Object.keys(val)
-          .filter((k) => !deleted.has(k) && !deleted.has(val[k]?.email))
+          .filter((k) => {
+            if (deleted.has(k) || deleted.has(val[k]?.email)) return false;
+            const email = (val[k]?.email || "").toLowerCase().trim();
+            if (k.startsWith("demo_") || k.startsWith("new_user_")) return false;
+            return email.endsWith("@gmail.com") || email === "must.market@admin.com";
+          })
           .map((k) => ({
             ...val[k],
             id: k,

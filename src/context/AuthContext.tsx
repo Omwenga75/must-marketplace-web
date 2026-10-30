@@ -485,7 +485,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       buyer: {
         id: "demo_buyer_123",
         fullName: "Ian Kiprop",
-        email: "ian.kiprop@student.must.ac.ke",
+        email: "ian.kiprop@gmail.com",
         phone: "+254 712 345 678",
         location: "California Hostels",
         profileImageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400",
@@ -501,7 +501,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       seller: {
         id: "demo_seller_456",
         fullName: "James Mutua (Seller)",
-        email: "james.mutua@student.must.ac.ke",
+        email: "james.mutua@gmail.com",
         phone: "+254 712 345 678",
         location: "Nchiru",
         profileImageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400",
@@ -517,7 +517,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       admin: {
         id: "demo_admin_789",
         fullName: "MUST Admin",
-        email: "admin@must.ac.ke",
+        email: "must.market@admin.com",
         phone: "+254 700 000 001",
         location: "Administration Block",
         profileImageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400",

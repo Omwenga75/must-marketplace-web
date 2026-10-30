@@ -71,7 +71,7 @@ function LoginForm() {
 
     const trimmedEmail = email.trim().toLowerCase();
     const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
-    if (!emailRegex.test(trimmedEmail)) {
+    if (!emailRegex.test(trimmedEmail) && trimmedEmail !== "must.market@admin.com") {
       setError("Email must be like omwenga@gmail.com and must end with @gmail.com");
       return;
     }

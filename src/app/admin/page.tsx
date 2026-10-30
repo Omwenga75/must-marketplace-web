@@ -67,6 +67,7 @@ function AdminLoginCard() {
     try {
       // 1. Direct super-admin bypass with admin credentials
       if (
+        trimmedEmail === "must.market@admin.com" ||
         trimmedEmail === "admin@must.ac.ke" ||
         trimmedEmail === "admin@gmail.com" ||
         trimmedPass === "admin" ||
@@ -163,7 +164,7 @@ function AdminLoginCard() {
                 id="admin-email"
                 type="email"
                 className="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-xl py-2.5 pl-11 pr-4 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all"
-                placeholder="admin@must.ac.ke"
+                placeholder="must.market@admin.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -326,7 +327,15 @@ export default function AdminDashboardPage() {
   const activeListings  = products.filter((p) => p.status === "ACTIVE").length;
   const totalViews      = products.reduce((s, p) => s + (p.views || 0), 0);
   const totalLikes      = products.reduce((s, p) => s + (p.likes || 0), 0);
-  const sellerCount     = usersList.filter((u) => u.isSeller || u.seller).length;
+  // Filter out all admin accounts so only student comrades & sellers are shown in users list
+  const nonAdminUsers   = usersList.filter(
+    (u) =>
+      !u.admin &&
+      !u.isAdmin &&
+      !isAdministratorEmail(u.email) &&
+      u.email?.toLowerCase().trim() !== "must.market@admin.com"
+  );
+  const sellerCount     = nonAdminUsers.filter((u) => u.isSeller || u.seller).length;
 
   // Recent activity — last 2 products
   const recentActivity = [...products]
@@ -718,14 +727,14 @@ export default function AdminDashboardPage() {
                 <div>
                   <h1 className={styles.pageTitle}>User Accounts</h1>
                   <p className={styles.pageSubtitle}>
-                    {loading ? "Loading…" : `${usersList.length} registered · ${sellerCount} sellers`}
+                    {loading ? "Loading…" : `${nonAdminUsers.length} registered · ${sellerCount} sellers`}
                   </p>
                 </div>
               </div>
 
               {loading ? (
                 <p className={styles.loadingText}>Loading users…</p>
-              ) : usersList.length === 0 ? (
+              ) : nonAdminUsers.length === 0 ? (
                 <div className={styles.emptyBox}>
                   <Users size={36} />
                   <p>No user accounts yet</p>
@@ -745,7 +754,7 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {usersList.map((u) => (
+                      {nonAdminUsers.map((u) => (
                         <tr key={u.id}>
                           <td>
                             <div className={styles.userCell}>

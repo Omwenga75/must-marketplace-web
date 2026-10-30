@@ -19,7 +19,20 @@ function ensureUsersFile(): User[] {
     }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+
+    // Filter out all fake emails: only allow emails ending in @gmail.com or the admin email
+    const valid = parsed.filter((u: User) => {
+      if (!u || !u.email) return false;
+      const email = u.email.toLowerCase().trim();
+      if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
+      return email.endsWith("@gmail.com") || email === "must.market@admin.com";
+    });
+
+    if (valid.length !== parsed.length) {
+      saveUsersFile(valid);
+    }
+    return valid;
   } catch (err) {
     console.error("Error reading users file:", err);
     return [];
@@ -126,6 +139,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email or id required" }, { status: 400 });
     }
 
+    if (emailLower && !emailLower.endsWith("@gmail.com") && emailLower !== "must.market@admin.com") {
+      return NextResponse.json(
+        { error: "Only emails ending with @gmail.com are permitted" },
+        { status: 400 }
+      );
+    }
+
     const users = ensureUsersFile();
     const products = getStoredProducts();
 
@@ -203,6 +223,13 @@ export async function PATCH(req: Request) {
 
     if (!emailLower && !id) {
       return NextResponse.json({ error: "Email or id required" }, { status: 400 });
+    }
+
+    if (emailLower && !emailLower.endsWith("@gmail.com") && emailLower !== "must.market@admin.com") {
+      return NextResponse.json(
+        { error: "Only emails ending with @gmail.com are permitted" },
+        { status: 400 }
+      );
     }
 
     const users = ensureUsersFile();
