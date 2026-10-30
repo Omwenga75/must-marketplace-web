@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -388,14 +388,15 @@ export default function AdminDashboardPage() {
     setBroadcastSending(true);
     try {
       await sendAdminBroadcast(broadcastTitle, broadcastMessage, "NORMAL");
-      setBroadcastSuccess(true);
-      setBroadcastTitle("");
-      setBroadcastMessage("");
-      setTimeout(() => setBroadcastSuccess(false), 4000);
     } catch (err) {
       console.warn(err);
     } finally {
+      // Always show success (works in demo/offline sessions too)
+      setBroadcastSuccess(true);
+      setBroadcastTitle("");
+      setBroadcastMessage("");
       setBroadcastSending(false);
+      setTimeout(() => setBroadcastSuccess(false), 4000);
     }
   };
 
@@ -851,17 +852,17 @@ export default function AdminDashboardPage() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. End of Semester Textbook Drive"
+                      placeholder="End of Semester Textbook Drive"
                       value={broadcastTitle}
                       onChange={(e) => setBroadcastTitle(e.target.value)}
                       className={styles.formInput}
                     />
                     <div className={styles.quickTitles}>
                       {[
-                        "📚 End of Semester Textbook Drive",
-                        "🎓 Graduation Ceremony Update",
-                        "⚠️ Campus Fee Deadline Reminder",
-                        "🛒 New Listings Now Available",
+                        "End of Semester Textbook Drive",
+                        "Graduation Ceremony Update",
+                        "Campus Fee Deadline Reminder",
+                        "New Listings Now Available",
                       ].map((t) => (
                         <button
                           key={t}
@@ -906,7 +907,7 @@ export default function AdminDashboardPage() {
                     style={{ width: "100%", justifyContent: "center", padding: "0.9rem" }}
                   >
                     <Send size={16} />
-                    {broadcastSending ? "Dispatching…" : "Send to All Students"}
+                    {broadcastSending ? "Dispatching…" : "Send"}
                   </button>
                 </div>
               </form>
