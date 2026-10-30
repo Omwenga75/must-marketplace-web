@@ -17,7 +17,6 @@ import {
   Menu,
   X,
   ArrowRight,
-  TrendingUp,
   Heart,
   ExternalLink,
   Activity,
@@ -363,17 +362,6 @@ export default function AdminDashboardPage() {
                     <h3>Total Listings</h3>
                     <p>{loading ? "—" : totalListings}</p>
                     <small>{activeListings} active</small>
-                  </div>
-                </div>
-
-                <div className={styles.statCard}>
-                  <div className={`${styles.statIcon} ${styles.statIconBlue}`}>
-                    <TrendingUp size={22} />
-                  </div>
-                  <div className={styles.statInfo}>
-                    <h3>Active Listings</h3>
-                    <p>{loading ? "—" : activeListings}</p>
-                    <small>currently on market</small>
                   </div>
                 </div>
 
