@@ -47,16 +47,6 @@ const NAV_ITEMS: { label: string; tab: AdminTab; icon: React.ElementType }[] = [
   { label: "Broadcast",  tab: "broadcast",  icon: Megaphone },
 ];
 
-function statusBadge(status: string, styles: Record<string, string>) {
-  if (status === "ACTIVE")
-    return <span className={styles.badgeActive}>Active</span>;
-  if (status === "SOLD")
-    return <span className={styles.badgeSold}>Sold</span>;
-  return (
-    <span className={styles.badgeSold}>{status}</span>
-  );
-}
-
 function AdminLoginCard() {
   const { login, loginAsDemoUser, updateUserProfile } = useAuth();
   const [email, setEmail] = useState("");
@@ -631,7 +621,7 @@ export default function AdminDashboardPage() {
                           <div className={styles.activityBody}>
                             <div className={styles.activityTitle}>{p.title}</div>
                             <div className={styles.activitySub}>
-                              {formatPrice(p.price)} · {p.sellerName} · {p.status}
+                              {formatPrice(p.price)} · {p.sellerName}
                             </div>
                           </div>
                           <span className={styles.activityTime}>
@@ -678,7 +668,6 @@ export default function AdminDashboardPage() {
                         <th>Price</th>
                         <th>Seller</th>
                         <th>Location</th>
-                        <th>Status</th>
                         <th>Posted</th>
                         <th>Actions</th>
                       </tr>
@@ -713,7 +702,6 @@ export default function AdminDashboardPage() {
                           </td>
                           <td className={styles.tableSellerName}>{p.sellerName}</td>
                           <td>{p.location}</td>
-                          <td>{statusBadge(p.status, styles)}</td>
                           <td>{formatRelativeTime(p.createdAt)}</td>
                           <td>
                             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
