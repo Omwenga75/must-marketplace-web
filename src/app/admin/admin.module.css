@@ -58,12 +58,14 @@
   --admin-scrollbar-thumb: rgba(0, 0, 0, 0.15);
 
   display: flex;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
   background-color: var(--admin-bg);
   color: var(--admin-text-main);
   font-family: var(--font-geist-sans, system-ui, sans-serif);
-  overflow-x: hidden;
   max-width: 100vw;
   width: 100%;
   position: relative;
@@ -134,20 +136,13 @@
   flex-direction: column;
   padding: 1.5rem 1rem;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
   height: 100vh;
   height: 100dvh;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--admin-scrollbar-thumb) transparent;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden; /* Admin sidebar is never scrollable */
+  user-select: none;
   transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-thumb {
-  background: var(--admin-scrollbar-thumb);
-  border-radius: 4px;
 }
 
 .sidebarHeader {
@@ -277,10 +272,14 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   width: 100%;
   max-width: 100vw;
   background-color: var(--admin-bg);
-  overflow-x: hidden;
+  overflow: hidden;
   transition: background-color 0.2s ease;
 }
 
@@ -294,8 +293,6 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 2rem;
-  position: sticky;
-  top: 0;
   z-index: 40;
   box-sizing: border-box;
   width: 100%;
@@ -427,9 +424,25 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--admin-scrollbar-thumb) transparent;
+}
+
+.pageContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.pageContainer::-webkit-scrollbar-thumb {
+  background: var(--admin-scrollbar-thumb);
+  border-radius: 6px;
+}
+
+.pageContainer::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ── Page Header ───────────────────────────────────────────────── */
