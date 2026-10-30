@@ -1091,26 +1091,30 @@
 
 /* Quick-title suggestion chips */
 .quickTitles {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
 
 .quickTitleChip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 0.3rem;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 10px;
   border: 1.5px solid #e2e8f0;
   background: #f8fafc;
   color: #475569;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .quickTitleChip:hover {
