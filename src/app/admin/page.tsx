@@ -33,17 +33,18 @@ import {
   fetchProducts,
   deleteProduct,
   fetchAllUsers,
+  deleteUserAccount,
   sendAdminBroadcast,
 } from "@/lib/firebase/services";
 import { formatPrice, formatRelativeTime, isAdministratorEmail } from "@/lib/utils";
 import styles from "./admin.module.css";
 
-type AdminTab = "overview" | "listings" | "students" | "broadcast";
+type AdminTab = "overview" | "listings" | "users" | "broadcast";
 
 const NAV_ITEMS: { label: string; tab: AdminTab; icon: React.ElementType }[] = [
   { label: "Dashboard",  tab: "overview",   icon: LayoutDashboard },
   { label: "Listings",   tab: "listings",   icon: Package },
-  { label: "Students",   tab: "students",   icon: Users },
+  { label: "Users",      tab: "users",      icon: Users },
   { label: "Broadcast",  tab: "broadcast",  icon: Megaphone },
 ];
 
@@ -231,8 +232,8 @@ export default function AdminDashboardPage() {
   // Persist active tab in URL hash so refresh restores the same tab
   const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     if (typeof window !== "undefined") {
-      const hash = window.location.hash.replace("#", "") as AdminTab;
-      const valid: AdminTab[] = ["overview", "listings", "students", "broadcast"];
+      const hash = window.location.hash.replace("#", "").toLowerCase() as AdminTab;
+      const valid: AdminTab[] = ["overview", "listings", "users", "broadcast"];
       if (valid.includes(hash)) return hash;
     }
     return "overview";
@@ -336,6 +337,13 @@ export default function AdminDashboardPage() {
     if (confirm("Admin: Permanently delete this listing?")) {
       await deleteProduct(productId);
       setProducts((prev) => prev.filter((p) => p.id !== productId));
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm("Admin: Permanently delete this user account?")) {
+      await deleteUserAccount(userId);
+      setUsersList((prev) => prev.filter((u) => u.id !== userId));
     }
   };
 
@@ -531,7 +539,7 @@ export default function AdminDashboardPage() {
                   <div className={styles.statInfo}>
                     <h3>Total Likes</h3>
                     <p>{loading ? "—" : totalLikes.toLocaleString()}</p>
-                    <small>student bookmarks</small>
+                    <small>user bookmarks</small>
                   </div>
                 </div>
               </div>
@@ -553,10 +561,10 @@ export default function AdminDashboardPage() {
                       <Package size={15} />
                     </button>
                     <button
-                      onClick={() => setActiveTab("students")}
+                      onClick={() => setActiveTab("users")}
                       className={styles.btnOutline}
                     >
-                      <span>Manage Students</span>
+                      <span>Manage Users</span>
                       <Users size={15} />
                     </button>
                     <button
@@ -703,12 +711,12 @@ export default function AdminDashboardPage() {
             </>
           )}
 
-          {/* ── TAB: STUDENTS ───────────────────────────────────────── */}
-          {activeTab === "students" && (
+          {/* ── TAB: USERS ─────────────────────────────────────────── */}
+          {activeTab === "users" && (
             <>
               <div className={styles.pageHeader}>
                 <div>
-                  <h1 className={styles.pageTitle}>Student Accounts</h1>
+                  <h1 className={styles.pageTitle}>User Accounts</h1>
                   <p className={styles.pageSubtitle}>
                     {loading ? "Loading…" : `${usersList.length} registered · ${sellerCount} sellers`}
                   </p>
@@ -716,23 +724,24 @@ export default function AdminDashboardPage() {
               </div>
 
               {loading ? (
-                <p className={styles.loadingText}>Loading students…</p>
+                <p className={styles.loadingText}>Loading users…</p>
               ) : usersList.length === 0 ? (
                 <div className={styles.emptyBox}>
                   <Users size={36} />
-                  <p>No student accounts yet</p>
+                  <p>No user accounts yet</p>
                 </div>
               ) : (
                 <div className={styles.tableWrapper}>
                   <table className={styles.table}>
                     <thead>
                       <tr>
-                        <th>Student</th>
+                        <th>User</th>
                         <th>Phone</th>
                         <th>Location</th>
                         <th>Listings</th>
                         <th>Sold</th>
                         <th>Role</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -761,8 +770,19 @@ export default function AdminDashboardPage() {
                             {u.isSeller || u.seller ? (
                               <span className={styles.badgeSeller}>Seller</span>
                             ) : (
-                              <span className={styles.badgeStudent}>Student</span>
+                              <span className={styles.badgeUser}>User</span>
                             )}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(u.id)}
+                              className={styles.btnDanger}
+                              title="Delete user"
+                            >
+                              <Trash2 size={13} />
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -780,7 +800,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <h1 className={styles.pageTitle}>Campus Broadcast</h1>
                   <p className={styles.pageSubtitle}>
-                    Send instant alerts and announcements to all registered students
+                    Send instant alerts and announcements to all registered users
                   </p>
                 </div>
               </div>
@@ -800,7 +820,7 @@ export default function AdminDashboardPage() {
                   {broadcastSuccess && (
                     <div className={styles.successBanner}>
                       <CheckCircle2 size={16} />
-                      <span>Broadcast successfully dispatched to all student accounts!</span>
+                      <span>Broadcast successfully dispatched to all user accounts!</span>
                     </div>
                   )}
 

@@ -86,3 +86,32 @@ export async function POST(req: Request) {
     );
   }
 }
+
+// DELETE /api/products — Permanently remove listing from server storage
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    let id = searchParams.get("id");
+    if (!id) {
+      try {
+        const body = await req.json();
+        id = body?.id;
+      } catch {}
+    }
+    if (!id) {
+      return NextResponse.json({ error: "Product ID required" }, { status: 400 });
+    }
+
+    const existing = ensureProductsFile();
+    const filtered = existing.filter((p) => p.id !== id);
+    saveProductsFile(filtered);
+
+    return NextResponse.json({ success: true, id }, { status: 200 });
+  } catch (err: any) {
+    console.error("Error deleting product via API:", err);
+    return NextResponse.json(
+      { error: err?.message || "Failed to delete product" },
+      { status: 500 }
+    );
+  }
+}

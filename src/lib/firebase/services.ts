@@ -36,6 +36,63 @@ const LOCAL_STORAGE_PRODUCTS_KEY = "must_marketplace_cached_products";
 const PRODUCT_LIKES_KEY = "must_product_likes";
 const UNIFIED_FAVORITES_KEY = "must_saved_product_ids";
 const GUEST_FAVORITES_KEY = "must_guest_favorites";
+const DELETED_PRODUCT_IDS_KEY = "must_deleted_product_ids";
+const DELETED_USER_IDS_KEY = "must_deleted_user_ids";
+const DELETED_NOTIFICATION_IDS_KEY = "must_deleted_notification_ids";
+
+export function getDeletedProductIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_PRODUCT_IDS_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedProductId(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const ids = getDeletedProductIds();
+    ids.add(id);
+    localStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
+export function getDeletedUserIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_USER_IDS_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedUserId(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const ids = getDeletedUserIds();
+    ids.add(id);
+    localStorage.setItem(DELETED_USER_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
+export function getDeletedNotificationIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DELETED_NOTIFICATION_IDS_KEY);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {}
+  return new Set();
+}
+
+export function addDeletedNotificationId(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const ids = getDeletedNotificationIds();
+    ids.add(id);
+    localStorage.setItem(DELETED_NOTIFICATION_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
 
 export function getProductLikes(productId: string, fallbackLikes?: number): number {
   if (typeof window === "undefined" || !productId) return fallbackLikes || 0;
@@ -151,25 +208,30 @@ export function updateProductLikes(productId: string, delta: number): number {
 }
 
 function getLocalStoredProducts(): Product[] {
-  if (typeof window === "undefined") return INITIAL_SAMPLE_PRODUCTS;
+  const deleted = getDeletedProductIds();
+  if (typeof window === "undefined") return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => ({
-          ...item,
-          likes: getProductLikes(item.id, item.likes),
-        }));
+        return parsed
+          .filter((item) => !deleted.has(item.id))
+          .map((item) => ({
+            ...item,
+            likes: getProductLikes(item.id, item.likes),
+          }));
       }
     }
   } catch (e) {
     console.error("Failed to read local products cache:", e);
   }
-  return INITIAL_SAMPLE_PRODUCTS.map((item) => ({
-    ...item,
-    likes: getProductLikes(item.id, item.likes),
-  }));
+  return INITIAL_SAMPLE_PRODUCTS
+    .filter((p) => !deleted.has(p.id))
+    .map((item) => ({
+      ...item,
+      likes: getProductLikes(item.id, item.likes),
+    }));
 }
 
 function setLocalStoredProducts(products: Product[]) {
@@ -186,17 +248,21 @@ function setLocalStoredProducts(products: Product[]) {
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<Product[]> {
+  const deleted = getDeletedProductIds();
+
   // 1. Fetch from centralized server API (shared across all browsers & devices)
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
       if (res.ok) {
         const data: Product[] = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const list = data.map((item) => ({
-            ...item,
-            likes: getProductLikes(item.id, Number(item.likes) || 0),
-          }));
+        if (Array.isArray(data)) {
+          const list = data
+            .filter((item) => !deleted.has(item.id))
+            .map((item) => ({
+              ...item,
+              likes: getProductLikes(item.id, Number(item.likes) || 0),
+            }));
           setLocalStoredProducts(list);
           return list;
         }
@@ -216,6 +282,7 @@ export async function fetchProducts(): Promise<Product[]> {
         const val = snapshot.val();
         const list: Product[] = [];
         Object.keys(val).forEach((key) => {
+          if (deleted.has(key)) return;
           const item = val[key];
           let imageUrls: string[] = [];
           if (Array.isArray(item.imageUrls)) {
@@ -645,6 +712,21 @@ export async function updateProduct(productId: string, updates: Partial<Product>
 }
 
 export async function deleteProduct(productId: string, sellerId?: string): Promise<void> {
+  // 1. Persist deletion in local deleted-set so it survives refresh across all fallbacks
+  addDeletedProductId(productId);
+
+  // 2. Delete from server-side storage (data/products.json)
+  if (typeof window !== "undefined") {
+    try {
+      await fetch(`/api/products?id=${encodeURIComponent(productId)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.warn("Failed to delete product from server API:", e);
+    }
+  }
+
+  // 3. Delete from Firebase RTDB if available
   if (database) {
     try {
       await remove(ref(database, `products/${productId}`));
@@ -659,6 +741,7 @@ export async function deleteProduct(productId: string, sellerId?: string): Promi
     }
   }
 
+  // 4. Update local cache
   const local = getLocalStoredProducts().filter((p) => p.id !== productId);
   setLocalStoredProducts(local);
 }
@@ -1431,12 +1514,19 @@ export function getDemoNotifications(name: string = "Comrade"): AppNotification[
 
 export function getLocalNotifications(userId: string): AppNotification[] {
   if (typeof window === "undefined" || !userId) return [];
+  const deletedNotifs = getDeletedNotificationIds();
   try {
     const raw = localStorage.getItem(`must_notifications_${userId}`);
     let saved: AppNotification[] = [];
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) saved = parsed;
+    let hasLoaded = false;
+    if (raw !== null) {
+      hasLoaded = true;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          saved = parsed.filter((n) => !deletedNotifs.has(n.id));
+        }
+      } catch {}
     }
 
     // Merge any admin broadcasts the user hasn't seen yet
@@ -1445,9 +1535,11 @@ export function getLocalNotifications(userId: string): AppNotification[] {
       const broadcasts: { title: string; message: string; priority: string; timestamp: number }[] =
         JSON.parse(broadcastsRaw);
       const existingIds = new Set(saved.map((n) => n.id));
+      let addedAny = false;
       broadcasts.forEach((b) => {
         const id = `broadcast_${b.timestamp}`;
-        if (!existingIds.has(id)) {
+        if (!existingIds.has(id) && !deletedNotifs.has(id)) {
+          addedAny = true;
           saved.unshift({
             id,
             title: `📢 ${b.title}`,
@@ -1460,18 +1552,18 @@ export function getLocalNotifications(userId: string): AppNotification[] {
         }
       });
       // Save the merged list so it persists
-      if (broadcasts.length > 0) {
+      if (addedAny) {
         try {
           localStorage.setItem(`must_notifications_${userId}`, JSON.stringify(saved));
         } catch {}
       }
     }
 
-    if (saved.length > 0) return saved;
+    if (hasLoaded) return saved;
   } catch {}
 
-  // For demo accounts only, initialize with clean demo notifications
-  if (userId.startsWith("demo_")) {
+  // For demo accounts without any prior local history, initialize with clean demo notifications
+  if (userId.startsWith("demo_") && deletedNotifs.size === 0) {
     const demos = getDemoNotifications();
     saveLocalNotifications(userId, demos);
     return demos;
@@ -1626,6 +1718,9 @@ export async function markAllNotificationsAsRead(userId: string) {
 export async function deleteNotification(userId: string, notificationId: string) {
   if (!userId || !notificationId) return;
 
+  // Track deletion so it never returns on refresh
+  addDeletedNotificationId(notificationId);
+
   // 1. Delete locally
   if (typeof window !== "undefined") {
     const list = getLocalNotifications(userId);
@@ -1647,8 +1742,10 @@ export async function deleteNotification(userId: string, notificationId: string)
 export async function clearAllNotifications(userId: string) {
   if (!userId) return;
 
-  // 1. Clear locally
+  // Track all current notifications as deleted
   if (typeof window !== "undefined") {
+    const list = getLocalNotifications(userId);
+    list.forEach((n) => addDeletedNotificationId(n.id));
     saveLocalNotifications(userId, []);
     notifyChatSync({ type: "notification_change", userId });
   }
@@ -1667,23 +1764,71 @@ export async function clearAllNotifications(userId: string) {
 // ADMIN SERVICES
 // ─────────────────────────────────────────────────────────────
 
-export async function fetchAllUsers(): Promise<User[]> {
-  if (!database) return [];
-  try {
-    const snap = await get(ref(database, "users"));
-    if (snap.exists()) {
-      const val = snap.val();
-      return Object.keys(val).map((k) => ({
-        ...val[k],
-        id: k,
-        fullName: val[k].fullName || "Student",
-        email: val[k].email || "",
-        seller: Boolean(val[k].seller || val[k].isSeller),
-        admin: Boolean(val[k].admin || val[k].isAdmin),
-      }));
+export async function deleteUserAccount(userId: string): Promise<void> {
+  addDeletedUserId(userId);
+
+  if (typeof window !== "undefined") {
+    try {
+      await fetch(`/api/users?id=${encodeURIComponent(userId)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.warn("Failed to delete user via API:", e);
     }
-  } catch (err) {
-    console.warn("Failed to fetch all users:", err);
+  }
+
+  if (database) {
+    try {
+      await remove(ref(database, `users/${userId}`));
+    } catch (err) {
+      console.warn("Failed to delete user in DB:", err);
+    }
+  }
+}
+
+export async function fetchAllUsers(): Promise<User[]> {
+  const deleted = getDeletedUserIds();
+
+  // 1. Try centralized server API first (data/users.json)
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/users", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          return data
+            .filter((u: User) => !deleted.has(u.id) && !deleted.has(u.email))
+            .map((u: User) => ({
+              ...u,
+              fullName: u.fullName || "User",
+            }));
+        }
+      }
+    } catch (e) {
+      console.debug("API fetch fallback for users:", e);
+    }
+  }
+
+  // 2. Fallback to Firebase RTDB
+  if (database) {
+    try {
+      const snap = await get(ref(database, "users"));
+      if (snap.exists()) {
+        const val = snap.val();
+        return Object.keys(val)
+          .filter((k) => !deleted.has(k) && !deleted.has(val[k]?.email))
+          .map((k) => ({
+            ...val[k],
+            id: k,
+            fullName: val[k].fullName || "User",
+            email: val[k].email || "",
+            seller: Boolean(val[k].seller || val[k].isSeller),
+            admin: Boolean(val[k].admin || val[k].isAdmin),
+          }));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch all users:", err);
+    }
   }
   return [];
 }

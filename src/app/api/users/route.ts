@@ -259,3 +259,29 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: err?.message || "Failed to patch user" }, { status: 500 });
   }
 }
+
+// DELETE /api/users — Permanently delete user account
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    let id = searchParams.get("id");
+    if (!id) {
+      try {
+        const body = await req.json();
+        id = body?.id;
+      } catch {}
+    }
+    if (!id) {
+      return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    }
+
+    const users = ensureUsersFile();
+    const filtered = users.filter((u) => u.id !== id && u.email !== id);
+    saveUsersFile(filtered);
+
+    return NextResponse.json({ success: true, id }, { status: 200 });
+  } catch (err: any) {
+    console.error("Error deleting user via API:", err);
+    return NextResponse.json({ error: err?.message || "Failed to delete user" }, { status: 500 });
+  }
+}
