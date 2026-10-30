@@ -42,6 +42,14 @@ export default function SellerDashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    const onProductDeleted = (e: any) => {
+      const pid = e.detail?.productId;
+      if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
+    };
+
+    window.addEventListener("must_product_deleted", onProductDeleted);
+    return () => window.removeEventListener("must_product_deleted", onProductDeleted);
   }, [user]);
 
   if (!user) {

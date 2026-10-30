@@ -4,11 +4,57 @@ import path from "path";
 import { User, Product } from "@/types";
 import { isAdministratorEmail } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const DELETED_USERS_FILE = path.join(DATA_DIR, "deleted_users.json");
 const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
 
+function getDeletedUserIds(): Set<string> {
+  try {
+    if (!fs.existsSync(DELETED_USERS_FILE)) {
+      return new Set();
+    }
+    const raw = fs.readFileSync(DELETED_USERS_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.filter(Boolean));
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveDeletedUserId(id: string): void {
+  try {
+    if (!id) return;
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const set = getDeletedUserIds();
+    set.add(id);
+    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
+  } catch (err) {
+    console.error("Error saving deleted user id:", err);
+  }
+}
+
+function removeDeletedUserId(id: string): void {
+  try {
+    if (!id) return;
+    const set = getDeletedUserIds();
+    if (set.has(id)) {
+      set.delete(id);
+      fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
+    }
+  } catch (err) {
+    console.error("Error un-deleting user id:", err);
+  }
+}
+
 function ensureUsersFile(): User[] {
+  const deleted = getDeletedUserIds();
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -21,10 +67,11 @@ function ensureUsersFile(): User[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    // Filter out all fake emails: only allow emails ending in @gmail.com or the admin email
+    // Filter out all fake emails & deleted users: only allow @gmail.com or admin
     const valid = parsed.filter((u: User) => {
       if (!u || !u.email) return false;
       const email = u.email.toLowerCase().trim();
+      if (deleted.has(u.id) || deleted.has(email)) return false;
       if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
       return email.endsWith("@gmail.com") || email === "must.market@admin.com";
     });
@@ -77,6 +124,14 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const emailParam = searchParams.get("email")?.toLowerCase().trim();
   const idParam = searchParams.get("id") || searchParams.get("uid");
+  const deletedSet = getDeletedUserIds();
+  const deletedArr = Array.from(deletedSet);
+
+  if (searchParams.get("deleted") === "1" || searchParams.get("onlyDeleted") === "1") {
+    return NextResponse.json(deletedArr, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
+  }
 
   const users = ensureUsersFile();
   const products = getStoredProducts();
@@ -88,7 +143,7 @@ export async function GET(req: Request) {
       return false;
     });
 
-    if (user) {
+    if (user && !deletedSet.has(user.id) && !deletedSet.has(user.email)) {
       const hasListings = userHasListings(user, products);
       const isSeller = Boolean(user.seller || user.isSeller || hasListings);
       const isAdmin = Boolean(user.admin || user.isAdmin || isAdministratorEmail(user.email));
@@ -101,7 +156,10 @@ export async function GET(req: Request) {
           isAdmin: isAdmin,
         },
         {
-          headers: { "Cache-Control": "no-store, max-age=0" },
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "X-Deleted-Users": JSON.stringify(deletedArr),
+          },
         }
       );
     }
@@ -109,22 +167,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Return all users
-  const enriched = users.map((u) => {
-    const hasListings = userHasListings(u, products);
-    const isSeller = Boolean(u.seller || u.isSeller || hasListings);
-    const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(u.email));
-    return {
-      ...u,
-      seller: isSeller,
-      isSeller: isSeller,
-      admin: isAdmin,
-      isAdmin: isAdmin,
-    };
-  });
+  // Return all non-deleted users
+  const enriched = users
+    .filter((u) => !deletedSet.has(u.id) && !deletedSet.has(u.email))
+    .map((u) => {
+      const hasListings = userHasListings(u, products);
+      const isSeller = Boolean(u.seller || u.isSeller || hasListings);
+      const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(u.email));
+      return {
+        ...u,
+        seller: isSeller,
+        isSeller: isSeller,
+        admin: isAdmin,
+        isAdmin: isAdmin,
+      };
+    });
 
   return NextResponse.json(enriched, {
-    headers: { "Cache-Control": "no-store, max-age=0" },
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "X-Deleted-Users": JSON.stringify(deletedArr),
+    },
   });
 }
 
@@ -145,6 +208,9 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    if (id) removeDeletedUserId(id);
+    if (emailLower) removeDeletedUserId(emailLower);
 
     const users = ensureUsersFile();
     const products = getStoredProducts();
@@ -232,6 +298,9 @@ export async function PATCH(req: Request) {
       );
     }
 
+    if (id) removeDeletedUserId(id);
+    if (emailLower) removeDeletedUserId(emailLower);
+
     const users = ensureUsersFile();
     const products = getStoredProducts();
 
@@ -303,10 +372,24 @@ export async function DELETE(req: Request) {
     }
 
     const users = ensureUsersFile();
+    const target = users.find((u) => u.id === id || u.email === id);
+    if (target?.id) saveDeletedUserId(target.id);
+    if (target?.email) saveDeletedUserId(target.email);
+    saveDeletedUserId(id);
+
     const filtered = users.filter((u) => u.id !== id && u.email !== id);
     saveUsersFile(filtered);
 
-    return NextResponse.json({ success: true, id }, { status: 200 });
+    return NextResponse.json(
+      { success: true, id, deletedIds: Array.from(getDeletedUserIds()) },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "X-Deleted-Users": JSON.stringify(Array.from(getDeletedUserIds())),
+        },
+      }
+    );
   } catch (err: any) {
     console.error("Error deleting user via API:", err);
     return NextResponse.json({ error: err?.message || "Failed to delete user" }, { status: 500 });

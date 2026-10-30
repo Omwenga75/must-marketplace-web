@@ -49,6 +49,23 @@ function MarketplaceContent() {
       .catch(() => {
         setLoading(false);
       });
+
+    const onProductDeleted = (e: any) => {
+      const pid = e.detail?.productId;
+      if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
+    };
+    const onProductCreated = (e: any) => {
+      const prod = e.detail?.product;
+      if (prod) setProducts((prev) => [prod, ...prev.filter((p) => p.id !== prod.id)]);
+    };
+
+    window.addEventListener("must_product_deleted", onProductDeleted);
+    window.addEventListener("must_product_created", onProductCreated);
+
+    return () => {
+      window.removeEventListener("must_product_deleted", onProductDeleted);
+      window.removeEventListener("must_product_created", onProductCreated);
+    };
   }, []);
 
   // Update query when URL params change

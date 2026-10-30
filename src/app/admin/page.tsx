@@ -297,6 +297,30 @@ export default function AdminDashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // Listen to real-time events across tabs & windows
+    const onProductDeleted = (e: any) => {
+      const pid = e.detail?.productId;
+      if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
+    };
+    const onProductCreated = (e: any) => {
+      const prod = e.detail?.product;
+      if (prod) setProducts((prev) => [prod, ...prev.filter((p) => p.id !== prod.id)]);
+    };
+    const onUserDeleted = (e: any) => {
+      const uid = e.detail?.userId;
+      if (uid) setUsersList((prev) => prev.filter((u) => u.id !== uid && u.email !== uid));
+    };
+
+    window.addEventListener("must_product_deleted", onProductDeleted);
+    window.addEventListener("must_product_created", onProductCreated);
+    window.addEventListener("must_user_deleted", onUserDeleted);
+
+    return () => {
+      window.removeEventListener("must_product_deleted", onProductDeleted);
+      window.removeEventListener("must_product_created", onProductCreated);
+      window.removeEventListener("must_user_deleted", onUserDeleted);
+    };
   }, []);
 
   // Close sidebar on tab change
@@ -337,7 +361,12 @@ export default function AdminDashboardPage() {
       !isAdministratorEmail(u.email) &&
       u.email?.toLowerCase().trim() !== "must.market@admin.com"
   );
-  const sellerCount     = nonAdminUsers.filter((u) => u.isSeller || u.seller).length;
+  const sellerCount     = nonAdminUsers.filter(
+    (u) =>
+      u.isSeller ||
+      u.seller ||
+      products.some((p) => p.sellerId === u.id || (u.phone && p.sellerPhone === u.phone))
+  ).length;
 
   const [adminNotifFilter, setAdminNotifFilter] = useState<"all" | "broadcast" | "user" | "listing" | "security">("all");
   const [readAdminNotifIds, setReadAdminNotifIds] = useState<Set<string>>(() => {
@@ -874,13 +903,31 @@ export default function AdminDashboardPage() {
                           <td>{u.phone ?? "—"}</td>
                           <td>{u.location ?? "Campus"}</td>
                           <td className={styles.listingsCount}>
-                            {u.activeListings ?? 0}
+                            {typeof u.activeListings === "number" && u.activeListings > 0
+                              ? u.activeListings
+                              : products.filter(
+                                  (p) =>
+                                    p.sellerId === u.id ||
+                                    (u.phone && p.sellerPhone === u.phone) ||
+                                    (u.email &&
+                                      p.sellerName &&
+                                      u.email.toLowerCase().includes(p.sellerName.toLowerCase().replace(/\s+/g, "")))
+                                ).length}
                           </td>
                           <td className={styles.soldCount}>
                             {u.soldItems ?? 0}
                           </td>
                           <td>
-                            {u.isSeller || u.seller ? (
+                            {u.isSeller ||
+                            u.seller ||
+                            products.some(
+                              (p) =>
+                                p.sellerId === u.id ||
+                                (u.phone && p.sellerPhone === u.phone) ||
+                                (u.email &&
+                                  p.sellerName &&
+                                  u.email.toLowerCase().includes(p.sellerName.toLowerCase().replace(/\s+/g, "")))
+                            ) ? (
                               <span className={styles.badgeSeller}>Seller</span>
                             ) : (
                               <span className={styles.badgeUser}>User</span>

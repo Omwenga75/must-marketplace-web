@@ -30,6 +30,7 @@ import {
   ChatroomTopic,
 } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS, SAMPLE_CATEGORIES } from "../constants";
+import { isAdministratorEmail } from "@/lib/utils";
 
 // Helper for local caching to allow offline demo & resilience
 const LOCAL_STORAGE_PRODUCTS_KEY = "must_marketplace_cached_products";
@@ -55,6 +56,41 @@ export function addDeletedProductId(id: string) {
     const ids = getDeletedProductIds();
     ids.add(id);
     localStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify([...ids]));
+
+    // Immediately purge from cached products
+    const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
+    if (cached) {
+      const list = JSON.parse(cached);
+      if (Array.isArray(list)) {
+        const cleaned = list.filter((p: any) => p.id !== id);
+        localStorage.setItem(LOCAL_STORAGE_PRODUCTS_KEY, JSON.stringify(cleaned));
+      }
+    }
+  } catch {}
+}
+
+export function addDeletedProductIds(newIds: string[]) {
+  if (typeof window === "undefined" || !Array.isArray(newIds) || newIds.length === 0) return;
+  try {
+    const current = getDeletedProductIds();
+    let changed = false;
+    newIds.forEach((id) => {
+      if (id && !current.has(id)) {
+        current.add(id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem(DELETED_PRODUCT_IDS_KEY, JSON.stringify([...current]));
+      const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
+      if (cached) {
+        const list = JSON.parse(cached);
+        if (Array.isArray(list)) {
+          const cleaned = list.filter((p: any) => !current.has(p.id));
+          localStorage.setItem(LOCAL_STORAGE_PRODUCTS_KEY, JSON.stringify(cleaned));
+        }
+      }
+    }
   } catch {}
 }
 
@@ -73,6 +109,23 @@ export function addDeletedUserId(id: string) {
     const ids = getDeletedUserIds();
     ids.add(id);
     localStorage.setItem(DELETED_USER_IDS_KEY, JSON.stringify([...ids]));
+  } catch {}
+}
+
+export function addDeletedUserIds(newIds: string[]) {
+  if (typeof window === "undefined" || !Array.isArray(newIds) || newIds.length === 0) return;
+  try {
+    const current = getDeletedUserIds();
+    let changed = false;
+    newIds.forEach((id) => {
+      if (id && !current.has(id)) {
+        current.add(id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem(DELETED_USER_IDS_KEY, JSON.stringify([...current]));
+    }
   } catch {}
 }
 
@@ -248,77 +301,115 @@ function setLocalStoredProducts(products: Product[]) {
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<Product[]> {
-  const deleted = getDeletedProductIds();
+  // 1. Sync deleted product IDs from server API and Firebase RTDB
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/products", { cache: "no-store" });
+      if (res.ok) {
+        const deletedHeader = res.headers.get("x-deleted-products");
+        if (deletedHeader) {
+          try {
+            const parsed = JSON.parse(deletedHeader);
+            if (Array.isArray(parsed)) addDeletedProductIds(parsed);
+          } catch {}
+        }
+      }
+    } catch {}
+  }
 
-  // 1. Fetch from centralized server API (shared across all browsers & devices)
+  if (database) {
+    try {
+      const delSnap = await get(ref(database, "deleted_products"));
+      if (delSnap.exists()) {
+        const val = delSnap.val();
+        if (val && typeof val === "object") {
+          addDeletedProductIds(Object.keys(val));
+        }
+      }
+    } catch {}
+  }
+
+  const deleted = getDeletedProductIds();
+  const productsMap = new Map<string, Product>();
+
+  // Helper to add or merge product
+  const addProd = (item: any, idKey?: string) => {
+    if (!item) return;
+    const id = idKey || item.id;
+    if (!id || deleted.has(id)) return;
+
+    let imageUrls: string[] = [];
+    if (Array.isArray(item.imageUrls)) {
+      imageUrls = item.imageUrls.filter(Boolean);
+    } else if (typeof item.imageUrls === "string") {
+      imageUrls = item.imageUrls.split(",").filter(Boolean);
+    } else if (item.imageUrl) {
+      imageUrls = [item.imageUrl];
+    }
+
+    const prod: Product = {
+      ...item,
+      id,
+      imageUrls:
+        imageUrls.length > 0
+          ? imageUrls
+          : ["https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=800"],
+      category: item.category || SAMPLE_CATEGORIES[0],
+      price: Number(item.price) || 0,
+      views: Number(item.views) || 0,
+      likes: getProductLikes(id, Number(item.likes) || 0),
+      status: item.status || "ACTIVE",
+      condition: item.condition || "NEW",
+      createdAt: item.createdAt || new Date().toISOString(),
+    };
+    productsMap.set(id, prod);
+  };
+
+  // 2. Fetch from centralized server API (data/products.json)
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
       if (res.ok) {
         const data: Product[] = await res.json();
         if (Array.isArray(data)) {
-          const list = data
-            .filter((item) => !deleted.has(item.id))
-            .map((item) => ({
-              ...item,
-              likes: getProductLikes(item.id, Number(item.likes) || 0),
-            }));
-          setLocalStoredProducts(list);
-          return list;
+          data.forEach((p) => addProd(p));
         }
       }
     } catch (e) {
-      console.debug("API fetch fallback to local/Firebase:", e);
+      console.debug("API fetch fallback for products:", e);
     }
   }
 
-  // 2. Fallback to Firebase RTDB if available
+  // 3. ALSO fetch from Firebase RTDB (merge new listings created by other users)
   if (database) {
     try {
       const productsRef = ref(database, "products");
       const snapshot = await get(productsRef);
-
       if (snapshot.exists()) {
         const val = snapshot.val();
-        const list: Product[] = [];
-        Object.keys(val).forEach((key) => {
-          if (deleted.has(key)) return;
-          const item = val[key];
-          let imageUrls: string[] = [];
-          if (Array.isArray(item.imageUrls)) {
-            imageUrls = item.imageUrls.filter(Boolean);
-          } else if (typeof item.imageUrls === "string") {
-            imageUrls = item.imageUrls.split(",").filter(Boolean);
-          } else if (item.imageUrl) {
-            imageUrls = [item.imageUrl];
-          }
-
-          list.push({
-            ...item,
-            id: key,
-            imageUrls: imageUrls.length > 0 ? imageUrls : ["https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=800"],
-            category: item.category || SAMPLE_CATEGORIES[0],
-            price: Number(item.price) || 0,
-            views: Number(item.views) || 0,
-            likes: getProductLikes(key, Number(item.likes) || 0),
-            status: item.status || "ACTIVE",
-            condition: item.condition || "NEW",
-            createdAt: item.createdAt || new Date().toISOString(),
+        if (val && typeof val === "object") {
+          Object.keys(val).forEach((key) => {
+            addProd(val[key], key);
           });
-        });
-
-        if (list.length > 0) {
-          list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-          setLocalStoredProducts(list);
-          return list;
         }
       }
     } catch (error) {
-      console.warn("Firebase fetch error, using cached/sample products:", error);
+      console.warn("Firebase fetch error for products:", error);
     }
   }
 
-  return getLocalStoredProducts();
+  // 4. If both server API and Firebase were empty or offline, fallback to local storage
+  if (productsMap.size === 0) {
+    const cachedList = getLocalStoredProducts();
+    cachedList.forEach((p) => addProd(p));
+  }
+
+  const result = Array.from(productsMap.values()).filter((p) => !deleted.has(p.id));
+  result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Keep local browser cache cleanly synchronized
+  setLocalStoredProducts(result);
+  return result;
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -628,9 +719,18 @@ export async function uploadProductImage(file: File): Promise<string> {
 export async function createProduct(
   productData: Omit<Product, "id" | "views" | "likes" | "createdAt" | "status">
 ): Promise<Product> {
+  // Generate unified unique ID up-front so API, Firebase RTDB, and client cache share the exact same ID
+  let unifiedId = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  if (database) {
+    try {
+      const newRef = push(ref(database, "products"));
+      if (newRef.key) unifiedId = newRef.key;
+    } catch {}
+  }
+
   const newProduct: Product = {
     ...productData,
-    id: `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: unifiedId,
     views: 0,
     likes: 0,
     status: "ACTIVE",
@@ -640,26 +740,20 @@ export async function createProduct(
   // 1. Post to centralized server API so ALL browsers (Chrome, Edge, guest, incognito) see it immediately!
   if (typeof window !== "undefined") {
     try {
-      const res = await fetch("/api/products", {
+      await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newProduct),
       });
-      if (res.ok) {
-        const saved = await res.json();
-        newProduct.id = saved.id || newProduct.id;
-      }
     } catch (e) {
       console.warn("Failed to post product to server API:", e);
     }
   }
 
-  // 2. Also try Firebase RTDB sync if possible
+  // 2. Save to Firebase RTDB with that exact unified ID
   if (database) {
     try {
-      const newRef = push(ref(database, "products"));
-      newProduct.id = newRef.key || newProduct.id;
-      await set(ref(database, `products/${newProduct.id}`), newProduct);
+      await set(ref(database, `products/${unifiedId}`), newProduct);
 
       // Increment seller's active listings count
       if (newProduct.sellerId) {
@@ -677,6 +771,18 @@ export async function createProduct(
   const local = getLocalStoredProducts().filter((p) => p.id !== newProduct.id);
   const updated = [newProduct, ...local];
   setLocalStoredProducts(updated);
+
+  // Broadcast addition across open tabs
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("must_product_created", { detail: { product: newProduct } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("must_marketplace_products_sync");
+        bc.postMessage({ type: "CREATE", product: newProduct });
+        bc.close();
+      }
+    } catch {}
+  }
 
   return newProduct;
 }
@@ -715,7 +821,7 @@ export async function deleteProduct(productId: string, sellerId?: string): Promi
   // 1. Persist deletion in local deleted-set so it survives refresh across all fallbacks
   addDeletedProductId(productId);
 
-  // 2. Delete from server-side storage (data/products.json)
+  // 2. Delete from server-side storage (data/products.json) and save in deleted_products.json
   if (typeof window !== "undefined") {
     try {
       await fetch(`/api/products?id=${encodeURIComponent(productId)}`, {
@@ -726,10 +832,15 @@ export async function deleteProduct(productId: string, sellerId?: string): Promi
     }
   }
 
-  // 3. Delete from Firebase RTDB if available
+  // 3. Delete from Firebase RTDB and record permanently in global deleted_products so all other devices sync it
   if (database) {
     try {
       await remove(ref(database, `products/${productId}`));
+      await set(ref(database, `deleted_products/${productId}`), {
+        deletedAt: Date.now(),
+        sellerId: sellerId || null,
+      });
+
       if (sellerId) {
         const sellerRef = ref(database, `users/${sellerId}/activeListings`);
         const snap = await get(sellerRef);
@@ -744,6 +855,18 @@ export async function deleteProduct(productId: string, sellerId?: string): Promi
   // 4. Update local cache
   const local = getLocalStoredProducts().filter((p) => p.id !== productId);
   setLocalStoredProducts(local);
+
+  // 5. Broadcast deletion across open tabs and windows immediately
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("must_product_deleted", { detail: { productId } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("must_marketplace_products_sync");
+        bc.postMessage({ type: "DELETE", productId });
+        bc.close();
+      }
+    } catch {}
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1831,33 +1954,106 @@ export async function deleteUserAccount(userId: string): Promise<void> {
   if (database) {
     try {
       await remove(ref(database, `users/${userId}`));
+      await set(ref(database, `deleted_users/${userId}`), { deletedAt: Date.now() });
     } catch (err) {
       console.warn("Failed to delete user in DB:", err);
     }
   }
+
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent("must_user_deleted", { detail: { userId } }));
+      if (typeof BroadcastChannel !== "undefined") {
+        const bc = new BroadcastChannel("must_marketplace_users_sync");
+        bc.postMessage({ type: "DELETE", userId });
+        bc.close();
+      }
+    } catch {}
+  }
 }
 
 export async function fetchAllUsers(): Promise<User[]> {
-  const deleted = getDeletedUserIds();
+  // 1. Sync deleted user IDs from server API header
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/users", { cache: "no-store" });
+      if (res.ok) {
+        const delHeader = res.headers.get("x-deleted-users");
+        if (delHeader) {
+          try {
+            const parsed = JSON.parse(delHeader);
+            if (Array.isArray(parsed)) addDeletedUserIds(parsed);
+          } catch {}
+        }
+      }
+    } catch {}
+  }
 
-  // 1. Try centralized server API first (data/users.json)
+  // 2. Sync deleted user IDs from Firebase RTDB
+  if (database) {
+    try {
+      const delSnap = await get(ref(database, "deleted_users"));
+      if (delSnap.exists()) {
+        const val = delSnap.val();
+        if (val && typeof val === "object") {
+          addDeletedUserIds(Object.keys(val));
+        }
+      }
+    } catch {}
+  }
+
+  const deleted = getDeletedUserIds();
+  const usersMap = new Map<string, User>();
+
+  const addUser = (u: any, fallbackId?: string) => {
+    if (!u) return;
+    const id = u.id || u.uid || fallbackId;
+    const email = (u.email || "").toLowerCase().trim();
+    if (!id && !email) return;
+
+    if (deleted.has(id) || deleted.has(email)) return;
+    if (id?.startsWith("demo_") || id?.startsWith("new_user_")) return;
+
+    // Only allow real @gmail.com accounts or the administrator account
+    if (!email.endsWith("@gmail.com") && email !== "must.market@admin.com") return;
+
+    const key = email || id;
+    const existing = usersMap.get(key) || (id ? usersMap.get(id) : undefined);
+
+    const isSeller = Boolean(u.seller || u.isSeller || existing?.seller || existing?.isSeller);
+    const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(email));
+
+    const merged: User = {
+      ...(existing || {}),
+      ...u,
+      id: id || existing?.id || key,
+      fullName: u.fullName || existing?.fullName || (email ? email.split("@")[0] : "User"),
+      email: email || existing?.email || "",
+      phone: u.phone || existing?.phone || null,
+      location: u.location || existing?.location || "Main Gate",
+      profileImageUrl: u.profileImageUrl || existing?.profileImageUrl || null,
+      seller: isSeller,
+      isSeller: isSeller,
+      admin: isAdmin,
+      isAdmin: isAdmin,
+      memberSince: u.memberSince || existing?.memberSince || String(Date.now()),
+      activeListings: typeof u.activeListings === "number" ? u.activeListings : (existing?.activeListings || 0),
+      soldItems: typeof u.soldItems === "number" ? u.soldItems : (existing?.soldItems || 0),
+      likes: typeof u.likes === "number" ? u.likes : (existing?.likes || 0),
+    };
+
+    usersMap.set(key, merged);
+    if (id) usersMap.set(id, merged);
+  };
+
+  // 3. Fetch from centralized server API (data/users.json)
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/users", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          return data
-            .filter((u: User) => {
-              if (deleted.has(u.id) || deleted.has(u.email)) return false;
-              const email = (u.email || "").toLowerCase().trim();
-              if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
-              return email.endsWith("@gmail.com") || email === "must.market@admin.com";
-            })
-            .map((u: User) => ({
-              ...u,
-              fullName: u.fullName || "User",
-            }));
+          data.forEach((u) => addUser(u));
         }
       }
     } catch (e) {
@@ -1865,33 +2061,37 @@ export async function fetchAllUsers(): Promise<User[]> {
     }
   }
 
-  // 2. Fallback to Firebase RTDB
+  // 4. ALWAYS query Firebase RTDB to discover all real live registered students & sellers
   if (database) {
     try {
       const snap = await get(ref(database, "users"));
       if (snap.exists()) {
         const val = snap.val();
-        return Object.keys(val)
-          .filter((k) => {
-            if (deleted.has(k) || deleted.has(val[k]?.email)) return false;
-            const email = (val[k]?.email || "").toLowerCase().trim();
-            if (k.startsWith("demo_") || k.startsWith("new_user_")) return false;
-            return email.endsWith("@gmail.com") || email === "must.market@admin.com";
-          })
-          .map((k) => ({
-            ...val[k],
-            id: k,
-            fullName: val[k].fullName || "User",
-            email: val[k].email || "",
-            seller: Boolean(val[k].seller || val[k].isSeller),
-            admin: Boolean(val[k].admin || val[k].isAdmin),
-          }));
+        if (val && typeof val === "object") {
+          Object.keys(val).forEach((k) => {
+            addUser(val[k], k);
+          });
+        }
       }
     } catch (err) {
-      console.warn("Failed to fetch all users:", err);
+      console.warn("Failed to fetch all users from Firebase RTDB:", err);
     }
   }
-  return [];
+
+  // 5. Also check active user in local storage
+  if (typeof window !== "undefined") {
+    try {
+      const rawActive = localStorage.getItem("must_active_user");
+      if (rawActive) {
+        const parsed = JSON.parse(rawActive);
+        addUser(parsed);
+      }
+    } catch {}
+  }
+
+  // Return deduplicated array
+  const uniqueUsers = Array.from(new Set(usersMap.values()));
+  return uniqueUsers;
 }
 
 export async function sendAdminBroadcast(

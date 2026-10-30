@@ -20,6 +20,14 @@ export default function SavedItemsPage() {
       .catch(() => {
         setLoading(false);
       });
+
+    const onProductDeleted = (e: any) => {
+      const pid = e.detail?.productId;
+      if (pid) setAllProducts((prev) => prev.filter((p) => p.id !== pid));
+    };
+
+    window.addEventListener("must_product_deleted", onProductDeleted);
+    return () => window.removeEventListener("must_product_deleted", onProductDeleted);
   }, []);
 
   const savedProducts = allProducts.filter((p) => favoriteIds.has(p.id));
