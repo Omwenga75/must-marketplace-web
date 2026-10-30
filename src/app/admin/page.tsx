@@ -255,6 +255,18 @@ export default function AdminDashboardPage() {
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastSuccess, setBroadcastSuccess] = useState(false);
 
+  // Notifications filter state – must be declared here (before any early returns) to follow React hooks rules
+  const [adminNotifFilter, setAdminNotifFilter] = useState<"all" | "broadcast" | "user" | "listing" | "security">("all");
+  const [readAdminNotifIds, setReadAdminNotifIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("must_admin_read_notifs");
+        if (raw) return new Set(JSON.parse(raw));
+      } catch {}
+    }
+    return new Set();
+  });
+
   // Synchronize color theme across admin dashboard and the rest of the application
   useEffect(() => {
     const syncTheme = () => {
@@ -367,17 +379,6 @@ export default function AdminDashboardPage() {
       u.seller ||
       products.some((p) => p.sellerId === u.id || (u.phone && p.sellerPhone === u.phone))
   ).length;
-
-  const [adminNotifFilter, setAdminNotifFilter] = useState<"all" | "broadcast" | "user" | "listing" | "security">("all");
-  const [readAdminNotifIds, setReadAdminNotifIds] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem("must_admin_read_notifs");
-        if (raw) return new Set(JSON.parse(raw));
-      } catch {}
-    }
-    return new Set();
-  });
 
   // Recent activity — last 2 products
   const recentActivity = [...products]

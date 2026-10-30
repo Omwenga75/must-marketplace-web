@@ -30,7 +30,6 @@ import {
   ChatroomTopic,
 } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS, SAMPLE_CATEGORIES } from "../constants";
-import { isAdministratorEmail } from "@/lib/utils";
 
 // Helper for local caching to allow offline demo & resilience
 const LOCAL_STORAGE_PRODUCTS_KEY = "must_marketplace_cached_products";
@@ -2021,7 +2020,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     const existing = usersMap.get(key) || (id ? usersMap.get(id) : undefined);
 
     const isSeller = Boolean(u.seller || u.isSeller || existing?.seller || existing?.isSeller);
-    const isAdmin = Boolean(u.admin || u.isAdmin || isAdministratorEmail(email));
+    const isAdmin = Boolean(u.admin || u.isAdmin || email === "must.market@admin.com" || email === "eronmuzk@gmail.com" || email === "admin@must.ac.ke");
 
     const merged: User = {
       ...(existing || {}),
@@ -2089,8 +2088,16 @@ export async function fetchAllUsers(): Promise<User[]> {
     } catch {}
   }
 
-  // Return deduplicated array
-  const uniqueUsers = Array.from(new Set(usersMap.values()));
+  // Return deduplicated array – use email or id as dedup key (Map already deduped by key)
+  const seen = new Set<string>();
+  const uniqueUsers: User[] = [];
+  for (const u of usersMap.values()) {
+    const key = u.email || u.id;
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      uniqueUsers.push(u);
+    }
+  }
   return uniqueUsers;
 }
 
