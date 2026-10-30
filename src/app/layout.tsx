@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { FavoritesProvider } from "@/context/FavoritesContext";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import AppLayout from "@/components/layout/AppLayout";
 
 export const metadata: Metadata = {
   title: "MUST Marketplace | Meru University of Science and Technology",
@@ -84,9 +83,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col bg-brand-light dark:bg-brand-dark antialiased">
         <AuthProvider>
           <FavoritesProvider>
-            <Navbar />
-            <main className="flex-1 w-full pb-16 sm:pb-0">{children}</main>
-            <Footer />
+            <AppLayout>{children}</AppLayout>
           </FavoritesProvider>
         </AuthProvider>
       </body>
