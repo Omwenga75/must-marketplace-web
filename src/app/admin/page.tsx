@@ -815,6 +815,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className={styles.broadcastWrap}>
+                {/* Left card – compose form */}
                 <div className={styles.card}>
                   <div className={styles.cardHeader}>
                     <h2 className={styles.cardTitle}>
@@ -867,6 +868,56 @@ export default function AdminDashboardPage() {
                       {broadcastSending ? "Dispatching…" : "Send to All Students"}
                     </button>
                   </form>
+                </div>
+
+                {/* Right card – broadcast tips / info */}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <h2 className={styles.cardTitle}>
+                      <span className={styles.broadcastHeading}>
+                        <Send size={18} className={styles.broadcastIcon} />
+                        Broadcast Guidelines
+                      </span>
+                    </h2>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
+                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
+                        <CheckCircle2 size={15} />
+                      </div>
+                      <div className={styles.activityBody}>
+                        <div className={styles.activityTitle}>Keep it concise</div>
+                        <div className={styles.activitySub}>Use a clear, short title that students will immediately understand.</div>
+                      </div>
+                    </div>
+                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
+                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
+                        <CheckCircle2 size={15} />
+                      </div>
+                      <div className={styles.activityBody}>
+                        <div className={styles.activityTitle}>Broadcast reaches everyone</div>
+                        <div className={styles.activitySub}>All registered students on MUST Marketplace receive this notification instantly.</div>
+                      </div>
+                    </div>
+                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
+                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
+                        <CheckCircle2 size={15} />
+                      </div>
+                      <div className={styles.activityBody}>
+                        <div className={styles.activityTitle}>Use for important updates only</div>
+                        <div className={styles.activitySub}>Reserve broadcasts for campus-wide announcements, policy changes, or urgent alerts.</div>
+                      </div>
+                    </div>
+                    <div className={styles.activityItem} style={{ alignItems: "flex-start" }}>
+                      <div className={styles.activityIcon} style={{ marginTop: "0.15rem" }}>
+                        <CheckCircle2 size={15} />
+                      </div>
+                      <div className={styles.activityBody}>
+                        <div className={styles.activityTitle}>Cannot be undone</div>
+                        <div className={styles.activitySub}>Once sent, broadcasts cannot be recalled. Review your message before dispatching.</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

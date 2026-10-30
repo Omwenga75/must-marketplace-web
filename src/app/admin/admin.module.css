@@ -1073,7 +1073,10 @@
 
 /* ── Broadcast container ───────────────────────────────────────── */
 .broadcastWrap {
-  max-width: 600px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
 }
 
 .broadcastHeading {
@@ -1140,6 +1143,10 @@
   .grid2Col {
     grid-template-columns: 1fr;
     gap: 1.25rem;
+  }
+
+  .broadcastWrap {
+    grid-template-columns: 1fr;
   }
 }
 
