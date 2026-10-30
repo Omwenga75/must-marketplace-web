@@ -367,10 +367,10 @@ export default function AdminDashboardPage() {
   const totalLikes      = products.reduce((s, p) => s + (p.likes || 0), 0);
   const sellerCount     = usersList.filter((u) => u.isSeller || u.seller).length;
 
-  // Recent activity — last 5 products
+  // Recent activity — last 2 products
   const recentActivity = [...products]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+    .slice(0, 2);
 
   const handleDelete = async (productId: string) => {
     if (confirm("Admin: Permanently delete this listing?")) {
@@ -605,14 +605,6 @@ export default function AdminDashboardPage() {
                       <span>Send Campus Broadcast</span>
                       <Megaphone size={15} />
                     </button>
-                    <Link href="/seller/products/new" className={styles.btnOutline}>
-                      <span>Add New Listing</span>
-                      <Plus size={15} />
-                    </Link>
-                    <Link href="/marketplace" className={styles.btnOutline}>
-                      <span>View Marketplace</span>
-                      <ExternalLink size={15} />
-                    </Link>
                   </div>
                 </div>
 
