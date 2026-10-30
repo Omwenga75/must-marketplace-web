@@ -285,7 +285,7 @@
 
 /* ── Top Bar ───────────────────────────────────────────────────── */
 .topbar {
-  height: 68px;
+  height: 62px;
   background: var(--admin-topbar-bg);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--admin-border);
@@ -420,7 +420,7 @@
 
 /* ── Page Container ────────────────────────────────────────────── */
 .pageContainer {
-  padding: 2rem;
+  padding: 1rem 2rem 2rem 2rem;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -450,7 +450,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   gap: 1rem;
 }
 
@@ -1128,9 +1128,9 @@
   .mobileMenuBtn { display: flex; }
   .closeSidebarBtn { display: flex; }
 
-  .topbar { padding: 0 1.25rem; height: 62px; }
+  .topbar { padding: 0 1.25rem; height: 58px; }
 
-  .pageContainer { padding: 1.5rem 1.25rem; }
+  .pageContainer { padding: 0.85rem 1.25rem 1.5rem 1.25rem; }
 
   .statsGrid {
     grid-template-columns: repeat(2, 1fr);
@@ -1160,7 +1160,7 @@
     max-width: 90px;
   }
 
-  .pageContainer { padding: 1rem 0.875rem; }
+  .pageContainer { padding: 0.65rem 0.875rem 1.25rem 0.875rem; }
 
   .pageTitle { font-size: 1.3rem; }
 
