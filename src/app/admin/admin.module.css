@@ -1088,6 +1088,48 @@
 .broadcastIcon {
   color: #ea580c;
 }
+
+/* Quick-title suggestion chips */
+.quickTitles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.quickTitleChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.quickTitleChip:hover {
+  background: #fff7ed;
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+:global(.dark) .quickTitleChip {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+:global(.dark) .quickTitleChip:hover {
+  background: #431407;
+  border-color: #ea580c;
+  color: #fb923c;
+}
 :global(.dark) .broadcastIcon {
   color: #fb923c;
 }

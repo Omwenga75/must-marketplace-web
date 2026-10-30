@@ -228,7 +228,20 @@ export default function AdminDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  // Persist active tab in URL hash so refresh restores the same tab
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.replace("#", "") as AdminTab;
+      const valid: AdminTab[] = ["overview", "listings", "students", "broadcast"];
+      if (valid.includes(hash)) return hash;
+    }
+    return "overview";
+  });
+
+  // Keep URL hash in sync whenever tab changes
+  useEffect(() => {
+    window.location.hash = activeTab;
+  }, [activeTab]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -843,6 +856,23 @@ export default function AdminDashboardPage() {
                       onChange={(e) => setBroadcastTitle(e.target.value)}
                       className={styles.formInput}
                     />
+                    <div className={styles.quickTitles}>
+                      {[
+                        "📚 End of Semester Textbook Drive",
+                        "🎓 Graduation Ceremony Update",
+                        "⚠️ Campus Fee Deadline Reminder",
+                        "🛒 New Listings Now Available",
+                      ].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={styles.quickTitleChip}
+                          onClick={() => setBroadcastTitle(t)}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
