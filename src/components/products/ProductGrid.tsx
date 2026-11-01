@@ -33,7 +33,7 @@ export default function ProductGrid({
             key={i}
             className="flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm animate-pulse"
           >
-            <div className="aspect-[4/3] bg-slate-200 dark:bg-slate-800 w-full" />
+            <div className="aspect-square bg-slate-200 dark:bg-slate-800 w-full" />
             <div className="p-3.5 space-y-2.5">
               <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-1/2" />
               <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />

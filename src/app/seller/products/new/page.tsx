@@ -528,7 +528,7 @@ export default function NewProductPage() {
             {/* Simulated Live Product Card */}
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-800/80 shadow-md">
               {/* Product Card Image */}
-              <div className="relative aspect-[4/3] bg-slate-100 dark:bg-slate-800">
+              <div className="relative aspect-square bg-slate-100 dark:bg-slate-800">
                 {images.length > 0 ? (
                   <img
                     src={images[0]}
