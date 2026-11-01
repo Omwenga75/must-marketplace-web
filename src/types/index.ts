@@ -1,6 +1,6 @@
 // Cross-platform type definitions matching com.must.marketplace.domain.model exactly
 
-export type ProductCondition = "NEW" | "SECOND_HAND";
+export type ProductCondition = "NEW" | "SECOND_HAND" | "BUSINESS";
 
 export type ProductStatus = "ACTIVE" | "BOOKED" | "SOLD" | "DRAFT" | "PAUSED";
 

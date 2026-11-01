@@ -283,7 +283,7 @@ function MarketplaceContent() {
 
           {selectedCondition !== "all" && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold shadow-xs">
-              Condition: {selectedCondition === "NEW" ? "New" : "Second Hand"}
+              Condition: {selectedCondition === "NEW" ? "New" : selectedCondition === "BUSINESS" ? "Business" : "Second Hand"}
               <X
                 className="w-3 h-3 cursor-pointer text-slate-400 hover:text-slate-600"
                 onClick={() => setSelectedCondition("all")}
@@ -368,11 +368,12 @@ function MarketplaceContent() {
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Condition
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   { value: "all", label: "All" },
-                  { value: "NEW", label: "New" },
-                  { value: "SECOND_HAND", label: "Used" },
+                  { value: "NEW", label: "Brand New" },
+                  { value: "SECOND_HAND", label: "Second Hand" },
+                  { value: "BUSINESS", label: "Business" },
                 ].map((item) => (
                   <button
                     key={item.value}

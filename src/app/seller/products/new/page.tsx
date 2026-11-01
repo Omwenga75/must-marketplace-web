@@ -162,7 +162,7 @@ export default function NewProductPage() {
         description:
           description.trim() ||
           `${selectedCategory.name} in ${
-            condition === "NEW" ? "brand new" : "second hand"
+            condition === "NEW" ? "brand new" : condition === "BUSINESS" ? "business" : "second hand"
           } condition at MUST ${location}.`,
         price: numericPrice,
         condition,
@@ -364,7 +364,7 @@ export default function NewProductPage() {
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Condition *
                 </label>
-                <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
+                <div className="grid grid-cols-3 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
                   <button
                     type="button"
                     onClick={() => setCondition("SECOND_HAND")}
@@ -386,6 +386,17 @@ export default function NewProductPage() {
                     }`}
                   >
                     Brand New
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCondition("BUSINESS")}
+                    className={`py-2 rounded-lg transition-all ${
+                      condition === "BUSINESS"
+                        ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    Business
                   </button>
                 </div>
               </div>
@@ -544,8 +555,10 @@ export default function NewProductPage() {
 
                 {/* Badge Overlays */}
                 <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-extrabold uppercase shadow-xs">
-                    {condition === "NEW" ? "Brand New" : "Second Hand"}
+                  <span className={`px-2 py-0.5 rounded-lg text-white text-[10px] font-extrabold uppercase shadow-xs ${
+                    condition === "NEW" ? "bg-emerald-600" : condition === "BUSINESS" ? "bg-blue-600" : "bg-slate-800"
+                  }`}>
+                    {condition === "NEW" ? "Brand New" : condition === "BUSINESS" ? "Business" : "Second Hand"}
                   </span>
                 </div>
 

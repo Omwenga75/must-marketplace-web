@@ -158,10 +158,16 @@ export default function ProductCard({ product }: ProductCardProps) {
               className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase backdrop-blur-md shadow-sm ${
                 product.condition === "NEW"
                   ? "bg-emerald-500/90 text-white"
+                  : product.condition === "BUSINESS"
+                  ? "bg-blue-600/90 text-white"
                   : "bg-slate-900/80 text-slate-100"
               }`}
             >
-              {product.condition === "NEW" ? "Brand New" : "Second Hand"}
+              {product.condition === "NEW"
+                ? "Brand New"
+                : product.condition === "BUSINESS"
+                ? "Business"
+                : "Second Hand"}
             </span>
           </div>
         )}
