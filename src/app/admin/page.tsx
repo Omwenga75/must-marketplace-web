@@ -311,9 +311,23 @@ export default function AdminDashboardPage() {
       .catch(() => setLoading(false));
 
     // Listen to real-time events across tabs & windows
+    const handleProductDeletedEvent = (pid: string, sId?: string) => {
+      if (!pid) return;
+      setProducts((prev) => prev.filter((p) => p.id !== pid));
+      if (sId) {
+        setUsersList((prev) =>
+          prev.map((u) => {
+            if (u.id === sId) {
+              return { ...u, activeListings: Math.max(0, (u.activeListings || 1) - 1) };
+            }
+            return u;
+          })
+        );
+      }
+    };
+
     const onProductDeleted = (e: any) => {
-      const pid = e.detail?.productId;
-      if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
+      handleProductDeletedEvent(e.detail?.productId, e.detail?.sellerId);
     };
     const onProductCreated = (e: any) => {
       const prod = e.detail?.product;
@@ -328,10 +342,39 @@ export default function AdminDashboardPage() {
     window.addEventListener("must_product_created", onProductCreated);
     window.addEventListener("must_user_deleted", onUserDeleted);
 
+    // Cross-tab BroadcastChannel
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("must_marketplace_products_sync");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "DELETE" && event.data?.productId) {
+          handleProductDeletedEvent(event.data.productId, event.data.sellerId);
+        } else if (event.data?.type === "CREATE" && event.data?.product) {
+          const prod = event.data.product;
+          setProducts((prev) => [prod, ...prev.filter((p) => p.id !== prod.id)]);
+        }
+      };
+    }
+
+    // Cross-window storage listener
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "must_last_deleted_product_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.productId) {
+            handleProductDeletedEvent(parsed.productId, parsed.sellerId);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("must_product_created", onProductCreated);
       window.removeEventListener("must_user_deleted", onUserDeleted);
+      window.removeEventListener("storage", onStorage);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -479,15 +522,32 @@ export default function AdminDashboardPage() {
 
   const handleDelete = async (productId: string) => {
     if (confirm("Admin: Permanently delete this listing?")) {
-      await deleteProduct(productId);
+      const prod = products.find((p) => p.id === productId);
+      const sId = prod?.sellerId;
       setProducts((prev) => prev.filter((p) => p.id !== productId));
+      if (sId) {
+        setUsersList((prev) =>
+          prev.map((u) => {
+            if (u.id === sId || (prod.sellerPhone && u.phone === prod.sellerPhone)) {
+              return { ...u, activeListings: Math.max(0, (u.activeListings || 1) - 1) };
+            }
+            return u;
+          })
+        );
+      }
+      await deleteProduct(productId, sId);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (confirm("Admin: Permanently delete this user account?")) {
+      setUsersList((prev) => prev.filter((u) => u.id !== userId && u.email !== userId));
+      const userListings = products.filter((p) => p.sellerId === userId);
+      setProducts((prev) => prev.filter((p) => p.sellerId !== userId));
       await deleteUserAccount(userId);
-      setUsersList((prev) => prev.filter((u) => u.id !== userId));
+      for (const p of userListings) {
+        await deleteProduct(p.id, userId);
+      }
     }
   };
 
@@ -908,16 +968,14 @@ export default function AdminDashboardPage() {
                           <td>{u.phone ?? "—"}</td>
                           <td>{u.location ?? "Campus"}</td>
                           <td className={styles.listingsCount}>
-                            {typeof u.activeListings === "number" && u.activeListings > 0
-                              ? u.activeListings
-                              : products.filter(
-                                  (p) =>
-                                    p.sellerId === u.id ||
-                                    (u.phone && p.sellerPhone === u.phone) ||
-                                    (u.email &&
-                                      p.sellerName &&
-                                      u.email.toLowerCase().includes(p.sellerName.toLowerCase().replace(/\s+/g, "")))
-                                ).length}
+                            {products.filter(
+                              (p) =>
+                                p.sellerId === u.id ||
+                                (u.phone && p.sellerPhone === u.phone) ||
+                                (u.email &&
+                                  p.sellerName &&
+                                  u.email.toLowerCase().includes(p.sellerName.toLowerCase().replace(/\s+/g, "")))
+                            ).length}
                           </td>
                           <td className={styles.soldCount}>
                             {u.soldItems ?? 0}

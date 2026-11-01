@@ -168,14 +168,49 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 });
     }
 
-    // 1. Persist deletion in both local file and Firebase RTDB
-    await persistDeletedId(id);
-
-    // 2. Remove from products.json
+    // 1. Persist deletion in local file and update deleted set
+    saveLocalDeletedId(id);
     const deletedSet = await getAllDeletedIds();
-    const existing = getOrInitProducts(new Set()); // read all
-    const filtered = existing.filter((p) => p.id !== id);
+    deletedSet.add(id);
+
+    // 2. Remove from products.json and ensure no deleted products remain
+    const stored = readProductsFile();
+    const sourceProducts = stored.length > 0 ? stored : INITIAL_SAMPLE_PRODUCTS;
+    const deletedProd = sourceProducts.find((p) => p.id === id);
+    const filtered = sourceProducts.filter((p) => !deletedSet.has(p.id) && p.id !== id);
     saveProductsFile(filtered);
+
+    // 3. Decrement seller's active listings in users.json if present
+    try {
+      const USERS_FILE = path.join(DATA_DIR, "users.json");
+      if (fs.existsSync(USERS_FILE)) {
+        const rawUsers = fs.readFileSync(USERS_FILE, "utf8");
+        const usersList: any[] = JSON.parse(rawUsers);
+        if (Array.isArray(usersList)) {
+          let updatedUsers = false;
+          const sId = deletedProd?.sellerId;
+          const sPhone = deletedProd?.sellerPhone;
+          const sName = deletedProd?.sellerName;
+          usersList.forEach((u) => {
+            if (
+              (sId && u.id === sId) ||
+              (sPhone && u.phone === sPhone) ||
+              (sName && u.fullName === sName)
+            ) {
+              const current = typeof u.activeListings === "number" ? u.activeListings : 1;
+              u.activeListings = Math.max(0, current - 1);
+              updatedUsers = true;
+            }
+          });
+          if (updatedUsers) {
+            fs.writeFileSync(USERS_FILE, JSON.stringify(usersList, null, 2), "utf8");
+          }
+        }
+      }
+    } catch {}
+
+    // 4. Non-blocking background sync to Firebase
+    saveFirebaseDeletedProduct(id).catch(() => {});
 
     const deletedList = Array.from(deletedSet);
     return NextResponse.json(

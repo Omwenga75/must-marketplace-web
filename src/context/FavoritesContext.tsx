@@ -67,12 +67,33 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const handleCustomEvent = (e: any) => {
       if (e?.detail?.allIds && Array.isArray(e.detail.allIds)) {
         setFavoriteIds(new Set(e.detail.allIds));
+      } else if (e?.detail?.productId && e?.detail?.isFavorited === false) {
+        setFavoriteIds((prev) => {
+          if (!prev.has(e.detail.productId)) return prev;
+          const next = new Set(prev);
+          next.delete(e.detail.productId);
+          return next;
+        });
+      }
+    };
+
+    const handleProductDeletedEvent = (e: any) => {
+      const pid = e?.detail?.productId;
+      if (pid) {
+        setFavoriteIds((prev) => {
+          if (!prev.has(pid)) return prev;
+          const next = new Set(prev);
+          next.delete(pid);
+          return next;
+        });
       }
     };
 
     window.addEventListener("must_favorites_updated", handleCustomEvent);
+    window.addEventListener("must_product_deleted", handleProductDeletedEvent);
 
     let bc: BroadcastChannel | null = null;
+    let bcProd: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       bc = new BroadcastChannel("must_marketplace_favorites_sync");
       bc.onmessage = (event) => {
@@ -80,11 +101,44 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           setFavoriteIds(new Set(event.data.allIds));
         }
       };
+
+      bcProd = new BroadcastChannel("must_marketplace_products_sync");
+      bcProd.onmessage = (event) => {
+        if (event.data?.type === "DELETE" && event.data?.productId) {
+          const pid = event.data.productId;
+          setFavoriteIds((prev) => {
+            if (!prev.has(pid)) return prev;
+            const next = new Set(prev);
+            next.delete(pid);
+            return next;
+          });
+        }
+      };
     }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "must_last_deleted_product_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.productId) {
+            setFavoriteIds((prev) => {
+              if (!prev.has(parsed.productId)) return prev;
+              const next = new Set(prev);
+              next.delete(parsed.productId);
+              return next;
+            });
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
 
     return () => {
       window.removeEventListener("must_favorites_updated", handleCustomEvent);
+      window.removeEventListener("must_product_deleted", handleProductDeletedEvent);
+      window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
+      if (bcProd) bcProd.close();
     };
   }, []);
 

@@ -79,6 +79,38 @@ export default function ProductDetailPage() {
       .catch(() => {
         setLoading(false);
       });
+
+    const onDeleted = (e: any) => {
+      const pid = e.detail?.productId;
+      if (pid === productId) setProduct(null);
+    };
+    window.addEventListener("must_product_deleted", onDeleted);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("must_marketplace_products_sync");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "DELETE" && event.data?.productId === productId) {
+          setProduct(null);
+        }
+      };
+    }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "must_last_deleted_product_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.productId === productId) setProduct(null);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("must_product_deleted", onDeleted);
+      window.removeEventListener("storage", onStorage);
+      if (bc) bc.close();
+    };
   }, [productId, user?.id]);
 
   if (loading) {

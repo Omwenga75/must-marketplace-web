@@ -43,13 +43,43 @@ export default function SellerDashboardPage() {
       })
       .catch(() => setLoading(false));
 
-    const onProductDeleted = (e: any) => {
-      const pid = e.detail?.productId;
+    const handleProductDeletedEvent = (pid: string) => {
       if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
     };
 
+    const onProductDeleted = (e: any) => {
+      handleProductDeletedEvent(e.detail?.productId);
+    };
+
     window.addEventListener("must_product_deleted", onProductDeleted);
-    return () => window.removeEventListener("must_product_deleted", onProductDeleted);
+
+    // Cross-tab BroadcastChannel
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("must_marketplace_products_sync");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "DELETE" && event.data?.productId) {
+          handleProductDeletedEvent(event.data.productId);
+        }
+      };
+    }
+
+    // Cross-window storage event
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "must_last_deleted_product_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.productId) handleProductDeletedEvent(parsed.productId);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("must_product_deleted", onProductDeleted);
+      window.removeEventListener("storage", onStorage);
+      if (bc) bc.close();
+    };
   }, [user]);
 
   if (!user) {

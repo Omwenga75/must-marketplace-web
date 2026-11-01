@@ -50,9 +50,12 @@ function MarketplaceContent() {
         setLoading(false);
       });
 
-    const onProductDeleted = (e: any) => {
-      const pid = e.detail?.productId;
+    const handleProductDeletedEvent = (pid: string) => {
       if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
+    };
+
+    const onProductDeleted = (e: any) => {
+      handleProductDeletedEvent(e.detail?.productId);
     };
     const onProductCreated = (e: any) => {
       const prod = e.detail?.product;
@@ -62,9 +65,36 @@ function MarketplaceContent() {
     window.addEventListener("must_product_deleted", onProductDeleted);
     window.addEventListener("must_product_created", onProductCreated);
 
+    // Cross-tab BroadcastChannel
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("must_marketplace_products_sync");
+      bc.onmessage = (event) => {
+        if (event.data?.type === "DELETE" && event.data?.productId) {
+          handleProductDeletedEvent(event.data.productId);
+        } else if (event.data?.type === "CREATE" && event.data?.product) {
+          const prod = event.data.product;
+          setProducts((prev) => [prod, ...prev.filter((p) => p.id !== prod.id)]);
+        }
+      };
+    }
+
+    // Cross-window storage event
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "must_last_deleted_product_sync" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.productId) handleProductDeletedEvent(parsed.productId);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+
     return () => {
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("must_product_created", onProductCreated);
+      window.removeEventListener("storage", onStorage);
+      if (bc) bc.close();
     };
   }, []);
 

@@ -300,38 +300,10 @@ function setLocalStoredProducts(products: Product[]) {
 // ─────────────────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<Product[]> {
-  // 1. Sync deleted product IDs from server API and Firebase RTDB
-  if (typeof window !== "undefined") {
-    try {
-      const res = await fetch("/api/products", { cache: "no-store" });
-      if (res.ok) {
-        const deletedHeader = res.headers.get("x-deleted-products");
-        if (deletedHeader) {
-          try {
-            const parsed = JSON.parse(deletedHeader);
-            if (Array.isArray(parsed)) addDeletedProductIds(parsed);
-          } catch {}
-        }
-      }
-    } catch {}
-  }
-
-  if (database) {
-    try {
-      const delSnap = await get(ref(database, "deleted_products"));
-      if (delSnap.exists()) {
-        const val = delSnap.val();
-        if (val && typeof val === "object") {
-          addDeletedProductIds(Object.keys(val));
-        }
-      }
-    } catch {}
-  }
-
   const deleted = getDeletedProductIds();
   const productsMap = new Map<string, Product>();
 
-  // Helper to add or merge product
+  // Helper to add or merge product if NOT deleted
   const addProd = (item: any, idKey?: string) => {
     if (!item) return;
     const id = idKey || item.id;
@@ -364,31 +336,62 @@ export async function fetchProducts(): Promise<Product[]> {
     productsMap.set(id, prod);
   };
 
-  // 2. Fetch from centralized server API (data/products.json)
+  // 1. Fetch from centralized server API (single call for both products and deleted IDs header)
   if (typeof window !== "undefined") {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
       if (res.ok) {
+        const deletedHeader = res.headers.get("x-deleted-products");
+        if (deletedHeader) {
+          try {
+            const parsed = JSON.parse(deletedHeader);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              addDeletedProductIds(parsed);
+              parsed.forEach((id: string) => deleted.add(id));
+            }
+          } catch {}
+        }
         const data: Product[] = await res.json();
         if (Array.isArray(data)) {
-          data.forEach((p) => addProd(p));
+          data.forEach((p) => {
+            if (!deleted.has(p.id)) addProd(p);
+          });
         }
       }
     } catch (e) {
-      console.debug("API fetch fallback for products:", e);
+      console.debug("API fetch error for products:", e);
     }
   }
 
-  // 3. ALSO fetch from Firebase RTDB (merge new listings created by other users)
+  // 2. Best-effort Firebase RTDB fetch (with fast 500ms timeout race so it NEVER blocks)
   if (database) {
     try {
-      const productsRef = ref(database, "products");
-      const snapshot = await get(productsRef);
-      if (snapshot.exists()) {
+      // Sync deleted products tombstone from Firebase
+      const delSnapPromise = get(ref(database, "deleted_products"));
+      const delSnap = await Promise.race([
+        delSnapPromise,
+        new Promise<null>((res) => setTimeout(() => res(null), 500)),
+      ]);
+      if (delSnap && delSnap.exists()) {
+        const val = delSnap.val();
+        if (val && typeof val === "object") {
+          const fbDeleted = Object.keys(val);
+          addDeletedProductIds(fbDeleted);
+          fbDeleted.forEach((id) => deleted.add(id));
+        }
+      }
+
+      // Read remote products
+      const prodSnapPromise = get(ref(database, "products"));
+      const snapshot = await Promise.race([
+        prodSnapPromise,
+        new Promise<null>((res) => setTimeout(() => res(null), 600)),
+      ]);
+      if (snapshot && snapshot.exists()) {
         const val = snapshot.val();
         if (val && typeof val === "object") {
           Object.keys(val).forEach((key) => {
-            addProd(val[key], key);
+            if (!deleted.has(key)) addProd(val[key], key);
           });
         }
       }
@@ -397,12 +400,15 @@ export async function fetchProducts(): Promise<Product[]> {
     }
   }
 
-  // 4. If both server API and Firebase were empty or offline, fallback to local storage
+  // 3. Fallback to local cache if both remote sources returned nothing
   if (productsMap.size === 0) {
     const cachedList = getLocalStoredProducts();
-    cachedList.forEach((p) => addProd(p));
+    cachedList.forEach((p) => {
+      if (!deleted.has(p.id)) addProd(p);
+    });
   }
 
+  // Purge any deleted items before sorting and saving
   const result = Array.from(productsMap.values()).filter((p) => !deleted.has(p.id));
   result.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
@@ -412,6 +418,8 @@ export async function fetchProducts(): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
+  if (!id || getDeletedProductIds().has(id)) return null;
+
   // 1. Try server API
   if (typeof window !== "undefined") {
     try {
@@ -817,53 +825,136 @@ export async function updateProduct(productId: string, updates: Partial<Product>
 }
 
 export async function deleteProduct(productId: string, sellerId?: string): Promise<void> {
+  if (!productId) return;
+
   // 1. Persist deletion in local deleted-set so it survives refresh across all fallbacks
   addDeletedProductId(productId);
 
-  // 2. Delete from server-side storage (data/products.json) and save in deleted_products.json
+  // 2. Immediately purge from local cached products
+  const local = getLocalStoredProducts().filter((p) => p.id !== productId);
+  setLocalStoredProducts(local);
+
+  // 3. Purge from all favorites stores (unified, guest, and user caches)
   if (typeof window !== "undefined") {
     try {
-      await fetch(`/api/products?id=${encodeURIComponent(productId)}`, {
+      const cleanFavArray = (key: string) => {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+              localStorage.setItem(key, JSON.stringify(arr.filter((id: string) => id !== productId)));
+            }
+          } catch {}
+        }
+      };
+      cleanFavArray(UNIFIED_FAVORITES_KEY);
+      cleanFavArray(GUEST_FAVORITES_KEY);
+      if (sellerId) cleanFavArray(`must_fav_${sellerId}`);
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("must_fav_")) {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const obj = JSON.parse(raw);
+              if (obj && typeof obj === "object" && obj[productId]) {
+                delete obj[productId];
+                localStorage.setItem(key, JSON.stringify(obj));
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Update seller's active listings in local storage if known
+  if (typeof window !== "undefined" && sellerId) {
+    try {
+      const userKey = `must_user_${sellerId}`;
+      const rawUser = localStorage.getItem(userKey);
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser);
+        if (typeof parsed.activeListings === "number") {
+          parsed.activeListings = Math.max(0, parsed.activeListings - 1);
+          localStorage.setItem(userKey, JSON.stringify(parsed));
+        }
+      }
+      const activeRaw = localStorage.getItem("must_active_user");
+      if (activeRaw) {
+        const parsed = JSON.parse(activeRaw);
+        if (parsed.id === sellerId && typeof parsed.activeListings === "number") {
+          parsed.activeListings = Math.max(0, parsed.activeListings - 1);
+          localStorage.setItem("must_active_user", JSON.stringify(parsed));
+        }
+      }
+    } catch {}
+  }
+
+  // 5. Delete from server-side storage (data/products.json) and save in deleted_products.json
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/products?id=${encodeURIComponent(productId)}`, {
         method: "DELETE",
       });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.deletedIds && Array.isArray(data.deletedIds)) {
+          addDeletedProductIds(data.deletedIds);
+        }
+      }
     } catch (e) {
       console.warn("Failed to delete product from server API:", e);
     }
   }
 
-  // 3. Delete from Firebase RTDB and record permanently in global deleted_products so all other devices sync it
+  // 6. Delete from Firebase RTDB (fast non-blocking 500ms race)
   if (database) {
-    try {
-      await remove(ref(database, `products/${productId}`));
-      await set(ref(database, `deleted_products/${productId}`), {
-        deletedAt: Date.now(),
-        sellerId: sellerId || null,
-      });
+    const fbPromise = (async () => {
+      try {
+        await remove(ref(database, `products/${productId}`));
+        await set(ref(database, `deleted_products/${productId}`), {
+          deletedAt: Date.now(),
+          sellerId: sellerId || null,
+        });
 
-      if (sellerId) {
-        const sellerRef = ref(database, `users/${sellerId}/activeListings`);
-        const snap = await get(sellerRef);
-        const count = (snap.val() as number) || 1;
-        await set(sellerRef, Math.max(0, count - 1));
+        if (sellerId) {
+          const sellerRef = ref(database, `users/${sellerId}/activeListings`);
+          const snap = await get(sellerRef);
+          const count = (snap.val() as number) || 1;
+          await set(sellerRef, Math.max(0, count - 1));
+        }
+      } catch (err) {
+        console.warn("Firebase deleteProduct error:", err);
       }
-    } catch (err) {
-      console.warn("Firebase deleteProduct error:", err);
-    }
+    })();
+    Promise.race([
+      fbPromise,
+      new Promise((res) => setTimeout(res, 500)),
+    ]).catch(() => {});
   }
 
-  // 4. Update local cache
-  const local = getLocalStoredProducts().filter((p) => p.id !== productId);
-  setLocalStoredProducts(local);
-
-  // 5. Broadcast deletion across open tabs and windows immediately
+  // 7. Broadcast deletion across open tabs, windows, and roles immediately
   if (typeof window !== "undefined") {
     try {
-      window.dispatchEvent(new CustomEvent("must_product_deleted", { detail: { productId } }));
+      // Local events
+      window.dispatchEvent(new CustomEvent("must_product_deleted", { detail: { productId, sellerId } }));
+      window.dispatchEvent(new CustomEvent("must_favorites_updated", { detail: { productId, isFavorited: false } }));
+
+      // BroadcastChannel for cross-tab in same browser
       if (typeof BroadcastChannel !== "undefined") {
         const bc = new BroadcastChannel("must_marketplace_products_sync");
-        bc.postMessage({ type: "DELETE", productId });
-        bc.close();
+        bc.postMessage({ type: "DELETE", productId, sellerId });
+        setTimeout(() => bc.close(), 1000);
       }
+
+      // Storage event for cross-tab & cross-window sync
+      localStorage.setItem(
+        "must_last_deleted_product_sync",
+        JSON.stringify({ productId, sellerId, timestamp: Date.now() })
+      );
     } catch {}
   }
 }

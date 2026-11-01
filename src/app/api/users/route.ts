@@ -360,6 +360,39 @@ export async function DELETE(req: Request) {
     const filtered = users.filter((u) => u.id !== id && u.email !== id);
     saveUsersFile(filtered);
 
+    // Also remove any listings belonging to this user
+    try {
+      const storedProds = getStoredProducts();
+      const targetId = target?.id || id;
+      const targetEmail = target?.email?.toLowerCase().trim();
+      const targetPhone = target?.phone;
+      const targetName = target?.fullName?.toLowerCase().trim();
+
+      const userProds = storedProds.filter((p) => {
+        if (targetId && (p.sellerId === targetId || p.sellerId === `u_${targetId}`)) return true;
+        if (targetEmail && p.sellerName && targetEmail.includes(p.sellerName.toLowerCase().replace(/\s+/g, ""))) return true;
+        if (targetName && p.sellerName && p.sellerName.toLowerCase() === targetName) return true;
+        if (targetPhone && p.sellerPhone && p.sellerPhone === targetPhone) return true;
+        return false;
+      });
+
+      if (userProds.length > 0) {
+        const remainingProds = storedProds.filter((p) => !userProds.some((up) => up.id === p.id));
+        if (fs.existsSync(DATA_DIR)) {
+          fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(remainingProds, null, 2), "utf8");
+          // Add to deleted products
+          const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, "deleted_products.json");
+          let delProds: string[] = [];
+          if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
+            try { delProds = JSON.parse(fs.readFileSync(DELETED_PRODUCTS_FILE, "utf8")); } catch {}
+          }
+          const delSet = new Set(delProds);
+          userProds.forEach((up) => delSet.add(up.id));
+          fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...delSet], null, 2), "utf8");
+        }
+      }
+    } catch {}
+
     const deletedSet = await getAllDeletedUserIds();
     const deletedArr = Array.from(deletedSet);
     return NextResponse.json(

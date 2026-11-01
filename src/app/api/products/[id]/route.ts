@@ -123,13 +123,67 @@ export async function DELETE(
       return NextResponse.json({ error: "Product ID required" }, { status: 400 });
     }
 
-    await persistDeletedId(id);
+    // 1. Persist deletion in local file
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+      const set = getLocalDeletedIds();
+      set.add(id);
+      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...set], null, 2), "utf8");
+    } catch {}
 
-    const allProducts = readAllProducts();
-    const filtered = allProducts.filter((p) => p.id !== id);
+    const deletedSet = await getAllDeletedIds();
+    deletedSet.add(id);
+
+    // 2. Remove from products.json and filter out any deleted products
+    const stored = readAllProducts();
+    const sourceProducts = stored.length > 0 ? stored : INITIAL_SAMPLE_PRODUCTS;
+    const deletedProd = sourceProducts.find((p) => p.id === id);
+    const filtered = sourceProducts.filter((p) => !deletedSet.has(p.id) && p.id !== id);
     saveProducts(filtered);
 
-    return NextResponse.json({ success: true, id }, { status: 200 });
+    // 3. Decrement seller's active listings in users.json
+    try {
+      const USERS_FILE = path.join(DATA_DIR, "users.json");
+      if (fs.existsSync(USERS_FILE)) {
+        const rawUsers = fs.readFileSync(USERS_FILE, "utf8");
+        const usersList: any[] = JSON.parse(rawUsers);
+        if (Array.isArray(usersList)) {
+          let updatedUsers = false;
+          const sId = deletedProd?.sellerId;
+          const sPhone = deletedProd?.sellerPhone;
+          const sName = deletedProd?.sellerName;
+          usersList.forEach((u) => {
+            if (
+              (sId && u.id === sId) ||
+              (sPhone && u.phone === sPhone) ||
+              (sName && u.fullName === sName)
+            ) {
+              const current = typeof u.activeListings === "number" ? u.activeListings : 1;
+              u.activeListings = Math.max(0, current - 1);
+              updatedUsers = true;
+            }
+          });
+          if (updatedUsers) {
+            fs.writeFileSync(USERS_FILE, JSON.stringify(usersList, null, 2), "utf8");
+          }
+        }
+      }
+    } catch {}
+
+    // Non-blocking Firebase sync
+    saveFirebaseDeletedProduct(id).catch(() => {});
+
+    const deletedList = Array.from(deletedSet);
+    return NextResponse.json(
+      { success: true, id, deletedIds: deletedList },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+          "X-Deleted-Products": JSON.stringify(deletedList),
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Failed to delete" }, { status: 500 });
   }
