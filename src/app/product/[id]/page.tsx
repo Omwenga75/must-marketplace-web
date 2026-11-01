@@ -182,7 +182,7 @@ export default function ProductDetailPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-pulse space-y-6">
         <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-28" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="aspect-square bg-slate-200 dark:bg-slate-800 rounded-3xl" />
+          <div className="h-[320px] sm:h-[380px] md:h-[420px] w-full bg-slate-200 dark:bg-slate-800 rounded-3xl" />
           <div className="space-y-4">
             <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
             <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
@@ -286,15 +286,25 @@ export default function ProductDetailPage() {
         {/* Left: Product Images Gallery with Scroll Arrows */}
         <div className="lg:col-span-7 space-y-4">
           <div
-            className="group relative aspect-square w-full rounded-3xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none"
+            className="group relative h-[320px] sm:h-[380px] md:h-[420px] lg:h-[440px] w-full rounded-3xl overflow-hidden bg-slate-900/5 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none flex items-center justify-center"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Active Display Image */}
+            {/* Ambient Blurred Background for Rich Color Fill */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <img
+                src={activeImage}
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover blur-2xl opacity-25 dark:opacity-20 scale-125"
+              />
+            </div>
+
+            {/* Active Display Image - perfectly fitted without cropping */}
             <img
               src={activeImage}
               alt={product.title}
-              className="w-full h-full object-cover object-center cursor-zoom-in transition-all duration-300"
+              className="relative z-10 w-full h-full object-contain object-center cursor-zoom-in transition-all duration-300 drop-shadow-sm p-2 sm:p-3"
               onClick={() => setIsFullscreen(true)}
             />
 
