@@ -8,19 +8,59 @@ import {
   saveFirebaseDeletedProduct,
 } from "@/lib/firebase/admin";
 
+import os from "os";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
-const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, "deleted_products.json");
+const REPO_DATA_DIR = path.join(process.cwd(), "data");
 
-// ── Local file helpers (fast, works in dev; ephemeral on Vercel) ────────────
+function getDataDir(): string {
+  try {
+    if (!fs.existsSync(REPO_DATA_DIR)) fs.mkdirSync(REPO_DATA_DIR, { recursive: true });
+    const testFile = path.join(REPO_DATA_DIR, ".write_test");
+    fs.writeFileSync(testFile, "1", "utf8");
+    fs.unlinkSync(testFile);
+    return REPO_DATA_DIR;
+  } catch {
+    const tmpDataDir = path.join(os.tmpdir(), "must_marketplace_data");
+    if (!fs.existsSync(tmpDataDir)) {
+      try { fs.mkdirSync(tmpDataDir, { recursive: true }); } catch {}
+    }
+    const files = [
+      "products.json",
+      "users.json",
+      "conversations.json",
+      "messages.json",
+      "deleted_products.json",
+      "deleted_users.json",
+    ];
+    files.forEach((f) => {
+      const src = path.join(REPO_DATA_DIR, f);
+      const dest = path.join(tmpDataDir, f);
+      if (!fs.existsSync(dest) && fs.existsSync(src)) {
+        try { fs.copyFileSync(src, dest); } catch {}
+      }
+    });
+    return tmpDataDir;
+  }
+}
+
+function getProductsFilePath(): string {
+  return path.join(getDataDir(), "products.json");
+}
+
+function getDeletedProductsFilePath(): string {
+  return path.join(getDataDir(), "deleted_products.json");
+}
+
+// ── Local file helpers (supports local dev and writable Vercel /tmp) ──────────
 
 function getLocalDeletedIds(): Set<string> {
   try {
-    if (!fs.existsSync(DELETED_PRODUCTS_FILE)) return new Set();
-    const raw = fs.readFileSync(DELETED_PRODUCTS_FILE, "utf8");
+    const filePath = getDeletedProductsFilePath();
+    if (!fs.existsSync(filePath)) return new Set();
+    const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return new Set(parsed.filter(Boolean));
   } catch {}
@@ -30,10 +70,11 @@ function getLocalDeletedIds(): Set<string> {
 function saveLocalDeletedId(id: string): void {
   try {
     if (!id) return;
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    const dir = getDataDir();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const set = getLocalDeletedIds();
     set.add(id);
-    fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...set], null, 2), "utf8");
+    fs.writeFileSync(getDeletedProductsFilePath(), JSON.stringify([...set], null, 2), "utf8");
   } catch (err) {
     console.error("saveLocalDeletedId error:", err);
   }
@@ -45,7 +86,7 @@ function removeLocalDeletedId(id: string): void {
     const set = getLocalDeletedIds();
     if (set.has(id)) {
       set.delete(id);
-      fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...set], null, 2), "utf8");
+      fs.writeFileSync(getDeletedProductsFilePath(), JSON.stringify([...set], null, 2), "utf8");
     }
   } catch {}
 }
@@ -67,9 +108,9 @@ async function persistDeletedId(id: string): Promise<void> {
 
 function readProductsFile(): Product[] {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(PRODUCTS_FILE)) return [];
-    const raw = fs.readFileSync(PRODUCTS_FILE, "utf8");
+    const filePath = getProductsFilePath();
+    if (!fs.existsSync(filePath)) return [];
+    const raw = fs.readFileSync(filePath, "utf8");
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) return parsed;
   } catch (err) {
@@ -80,8 +121,9 @@ function readProductsFile(): Product[] {
 
 function saveProductsFile(products: Product[]): void {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf8");
+    const dir = getDataDir();
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(getProductsFilePath(), JSON.stringify(products, null, 2), "utf8");
   } catch (err) {
     console.error("saveProductsFile error:", err);
   }
@@ -182,7 +224,7 @@ export async function DELETE(req: Request) {
 
     // 3. Decrement seller's active listings in users.json if present
     try {
-      const USERS_FILE = path.join(DATA_DIR, "users.json");
+      const USERS_FILE = path.join(getDataDir(), "users.json");
       if (fs.existsSync(USERS_FILE)) {
         const rawUsers = fs.readFileSync(USERS_FILE, "utf8");
         const usersList: any[] = JSON.parse(rawUsers);

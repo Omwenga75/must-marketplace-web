@@ -14,10 +14,17 @@ const RTDB_BASE =
   process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ||
   "https://must-marketplace-default-rtdb.firebaseio.com";
 
+function buildRtdbUrl(path: string): string {
+  const secret = process.env.FIREBASE_DATABASE_SECRET || process.env.FIREBASE_SECRET;
+  const sep = path.includes("?") ? "&" : "?";
+  const authQuery = secret ? `${sep}auth=${encodeURIComponent(secret)}` : "";
+  return `${RTDB_BASE}/${path}${authQuery}`;
+}
+
 /** Read all keys under a RTDB path via the REST API with safety timeout */
 async function rtdbGetKeys(path: string): Promise<string[]> {
   try {
-    const url = `${RTDB_BASE}/${path}.json?shallow=true`;
+    const url = buildRtdbUrl(`${path}.json?shallow=true`);
     const res = await fetch(url, {
       cache: "no-store",
       signal: AbortSignal.timeout(1200),
@@ -34,7 +41,7 @@ async function rtdbGetKeys(path: string): Promise<string[]> {
 /** Write a value to a RTDB path via the REST API (safety timeout 1200ms) */
 async function rtdbSet(path: string, value: unknown): Promise<boolean> {
   try {
-    const url = `${RTDB_BASE}/${path}.json`;
+    const url = buildRtdbUrl(`${path}.json`);
     const res = await fetch(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

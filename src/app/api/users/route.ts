@@ -11,17 +11,52 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-const DELETED_USERS_FILE = path.join(DATA_DIR, "deleted_users.json");
-const PRODUCTS_FILE = path.join(DATA_DIR, "products.json");
+import os from "os";
+
+const REPO_DATA_DIR = path.join(process.cwd(), "data");
+
+function getDataDir(): string {
+  try {
+    if (!fs.existsSync(REPO_DATA_DIR)) fs.mkdirSync(REPO_DATA_DIR, { recursive: true });
+    const testFile = path.join(REPO_DATA_DIR, ".write_test");
+    fs.writeFileSync(testFile, "1", "utf8");
+    fs.unlinkSync(testFile);
+    return REPO_DATA_DIR;
+  } catch {
+    const tmpDataDir = path.join(os.tmpdir(), "must_marketplace_data");
+    if (!fs.existsSync(tmpDataDir)) {
+      try { fs.mkdirSync(tmpDataDir, { recursive: true }); } catch {}
+    }
+    const files = ["products.json", "users.json", "conversations.json", "messages.json", "deleted_products.json", "deleted_users.json"];
+    files.forEach((f) => {
+      const src = path.join(REPO_DATA_DIR, f);
+      const dest = path.join(tmpDataDir, f);
+      if (!fs.existsSync(dest) && fs.existsSync(src)) {
+        try { fs.copyFileSync(src, dest); } catch {}
+      }
+    });
+    return tmpDataDir;
+  }
+}
+
+function getUsersFilePath(): string {
+  return path.join(getDataDir(), "users.json");
+}
+
+function getDeletedUsersFilePath(): string {
+  return path.join(getDataDir(), "deleted_users.json");
+}
+
+function getProductsFilePath(): string {
+  return path.join(getDataDir(), "products.json");
+}
 
 // ── Local deleted-IDs helpers ────────────────────────────────────────────────
 
 function getLocalDeletedUserIds(): Set<string> {
   try {
-    if (!fs.existsSync(DELETED_USERS_FILE)) return new Set();
-    const raw = fs.readFileSync(DELETED_USERS_FILE, "utf8");
+    if (!fs.existsSync(getDeletedUsersFilePath())) return new Set();
+    const raw = fs.readFileSync(getDeletedUsersFilePath(), "utf8");
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return new Set(parsed.filter(Boolean));
   } catch {}
@@ -31,10 +66,10 @@ function getLocalDeletedUserIds(): Set<string> {
 function saveLocalDeletedUserId(id: string): void {
   try {
     if (!id) return;
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(getDataDir())) fs.mkdirSync(getDataDir(), { recursive: true });
     const set = getLocalDeletedUserIds();
     set.add(id);
-    fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
+    fs.writeFileSync(getDeletedUsersFilePath(), JSON.stringify([...set], null, 2), "utf8");
   } catch (err) {
     console.error("saveLocalDeletedUserId error:", err);
   }
@@ -57,7 +92,7 @@ function removeLocalDeletedUserId(id: string): void {
     const set = getLocalDeletedUserIds();
     if (set.has(id)) {
       set.delete(id);
-      fs.writeFileSync(DELETED_USERS_FILE, JSON.stringify([...set], null, 2), "utf8");
+      fs.writeFileSync(getDeletedUsersFilePath(), JSON.stringify([...set], null, 2), "utf8");
     }
   } catch {}
 }
@@ -67,12 +102,12 @@ function removeLocalDeletedUserId(id: string): void {
 async function ensureUsersFile(): Promise<User[]> {
   const deleted = await getAllDeletedUserIds();
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(USERS_FILE)) {
-      fs.writeFileSync(USERS_FILE, JSON.stringify([], null, 2), "utf8");
+    if (!fs.existsSync(getDataDir())) fs.mkdirSync(getDataDir(), { recursive: true });
+    if (!fs.existsSync(getUsersFilePath())) {
+      fs.writeFileSync(getUsersFilePath(), JSON.stringify([], null, 2), "utf8");
       return [];
     }
-    const raw = fs.readFileSync(USERS_FILE, "utf8");
+    const raw = fs.readFileSync(getUsersFilePath(), "utf8");
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
@@ -97,8 +132,8 @@ async function ensureUsersFile(): Promise<User[]> {
 
 function saveUsersFile(users: User[]): void {
   try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+    if (!fs.existsSync(getDataDir())) fs.mkdirSync(getDataDir(), { recursive: true });
+    fs.writeFileSync(getUsersFilePath(), JSON.stringify(users, null, 2), "utf8");
   } catch (err) {
     console.error("saveUsersFile error:", err);
   }
@@ -106,8 +141,8 @@ function saveUsersFile(users: User[]): void {
 
 function getStoredProducts(): Product[] {
   try {
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      const raw = fs.readFileSync(PRODUCTS_FILE, "utf8");
+    if (fs.existsSync(getProductsFilePath())) {
+      const raw = fs.readFileSync(getProductsFilePath(), "utf8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -378,10 +413,10 @@ export async function DELETE(req: Request) {
 
       if (userProds.length > 0) {
         const remainingProds = storedProds.filter((p) => !userProds.some((up) => up.id === p.id));
-        if (fs.existsSync(DATA_DIR)) {
-          fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(remainingProds, null, 2), "utf8");
+        if (fs.existsSync(getDataDir())) {
+          fs.writeFileSync(getProductsFilePath(), JSON.stringify(remainingProds, null, 2), "utf8");
           // Add to deleted products
-          const DELETED_PRODUCTS_FILE = path.join(DATA_DIR, "deleted_products.json");
+          const DELETED_PRODUCTS_FILE = path.join(getDataDir(), "deleted_products.json");
           let delProds: string[] = [];
           if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
             try { delProds = JSON.parse(fs.readFileSync(DELETED_PRODUCTS_FILE, "utf8")); } catch {}
