@@ -198,42 +198,6 @@ export default function ProductDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8">
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
-        </button>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleShare}
-            className="p-2.5 rounded-full border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-            title="Share listing"
-          >
-            {copiedShare ? (
-              <Check className="w-4 h-4 text-emerald-600" />
-            ) : (
-              <Share2 className="w-4 h-4" />
-            )}
-          </button>
-          <button
-            onClick={handleToggleFavorite}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full border transition-all text-xs font-bold cursor-pointer ${
-              favorited
-                ? "bg-rose-50 text-rose-600 border-rose-300 dark:bg-rose-950/40 dark:border-rose-900 shadow-xs"
-                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800"
-            }`}
-          >
-            <Heart className={`w-4 h-4 transition-transform active:scale-125 ${favorited ? "fill-rose-500 text-rose-500" : ""}`} />
-            <span>{likesCount} {likesCount === 1 ? "Like" : "Likes"}</span>
-          </button>
-        </div>
-      </div>
-
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
         {/* Left: Gallery with Auto-scroll */}
@@ -336,7 +300,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Metadata */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
               <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
                 <MapPin className="w-4 h-4 text-secondary shrink-0" />
                 <span>{product.location || "MUST Main Gate"}</span>
@@ -361,6 +325,19 @@ export default function ProductDetailPage() {
                 <Calendar className="w-4 h-4" />
                 <span>{formatRelativeTime(product.createdAt)}</span>
               </span>
+              {/* Share — inline with metadata */}
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                title="Share listing"
+              >
+                {copiedShare ? (
+                  <Check className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Share2 className="w-4 h-4" />
+                )}
+                <span>{copiedShare ? "Copied!" : "Share"}</span>
+              </button>
             </div>
           </div>
 
