@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { Product } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS } from "@/lib/constants";
 import {
+  getFirebaseProductById,
+  saveFirebaseProduct,
+  deleteFirebaseProduct,
   getFirebaseDeletedProductIds,
   saveFirebaseDeletedProduct,
 } from "@/lib/firebase/admin";
-
-import os from "os";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -84,11 +86,6 @@ function saveLocalDeletedId(id: string): void {
   }
 }
 
-async function persistDeletedId(id: string): Promise<void> {
-  saveLocalDeletedId(id);
-  await saveFirebaseDeletedProduct(id);
-}
-
 function readAllProducts(): Product[] {
   try {
     const filePath = getProductsFilePath();
@@ -110,13 +107,6 @@ function saveProducts(products: Product[]): void {
   }
 }
 
-async function getActiveProducts(): Promise<Product[]> {
-  const deleted = await getAllDeletedIds();
-  const stored = readAllProducts();
-  if (stored.length > 0) return stored.filter((p) => !deleted.has(p.id));
-  return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
-}
-
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -127,8 +117,19 @@ export async function GET(
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  const products = await getActiveProducts();
-  const product = products.find((p) => p.id === id);
+  // 1. Try Firebase RTDB
+  try {
+    const fbProduct = await getFirebaseProductById(id);
+    if (fbProduct && !deleted.has(fbProduct.id)) {
+      return NextResponse.json(fbProduct, {
+        headers: { "Cache-Control": "no-store, max-age=0" },
+      });
+    }
+  } catch {}
+
+  // 2. Fallback to local cache
+  const products = readAllProducts();
+  const product = products.find((p) => p.id === id && !deleted.has(p.id));
 
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -146,16 +147,28 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const products = await getActiveProducts();
-    const index = products.findIndex((p) => p.id === id);
 
-    if (index === -1) {
+    // 1. Update in Firebase RTDB
+    let current = await getFirebaseProductById(id);
+    if (!current) {
+      const localList = readAllProducts();
+      current = localList.find((p) => p.id === id) || null;
+    }
+
+    if (!current) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const updated = { ...products[index], ...body, id };
-    products[index] = updated;
-    saveProducts(products);
+    const updated: Product = { ...current, ...body, id };
+    await saveFirebaseProduct(updated);
+
+    // 2. Update in local cache
+    const products = readAllProducts();
+    const index = products.findIndex((p) => p.id === id);
+    if (index !== -1) {
+      products[index] = updated;
+      saveProducts(products);
+    }
 
     return NextResponse.json(updated);
   } catch (err: any) {
@@ -173,20 +186,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Product ID required" }, { status: 400 });
     }
 
-    // 1. Persist deletion in local file
-    saveLocalDeletedId(id);
+    // 1. Permanently delete from Firebase Realtime Database
+    await deleteFirebaseProduct(id);
 
+    // 2. Persist deletion in local file & tombstone
+    saveLocalDeletedId(id);
     const deletedSet = await getAllDeletedIds();
     deletedSet.add(id);
 
-    // 2. Remove from products.json and filter out any deleted products
+    // 3. Remove from products.json cache
     const stored = readAllProducts();
     const sourceProducts = stored.length > 0 ? stored : INITIAL_SAMPLE_PRODUCTS;
     const deletedProd = sourceProducts.find((p) => p.id === id);
     const filtered = sourceProducts.filter((p) => !deletedSet.has(p.id) && p.id !== id);
     saveProducts(filtered);
 
-    // 3. Decrement seller's active listings in users.json
+    // 4. Decrement seller's active listings in users.json
     try {
       const USERS_FILE = path.join(getDataDir(), "users.json");
       if (fs.existsSync(USERS_FILE)) {
@@ -214,9 +229,6 @@ export async function DELETE(
         }
       }
     } catch {}
-
-    // Non-blocking Firebase sync
-    saveFirebaseDeletedProduct(id).catch(() => {});
 
     const deletedList = Array.from(deletedSet);
     return NextResponse.json(

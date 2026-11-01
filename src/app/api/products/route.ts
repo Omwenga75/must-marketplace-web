@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { Product } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS } from "@/lib/constants";
 import {
+  getFirebaseProducts,
+  saveFirebaseProduct,
+  deleteFirebaseProduct,
   getFirebaseDeletedProductIds,
   saveFirebaseDeletedProduct,
 } from "@/lib/firebase/admin";
-
-import os from "os";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -99,11 +101,6 @@ async function getAllDeletedIds(): Promise<Set<string>> {
   return new Set([...local, ...remote]);
 }
 
-async function persistDeletedId(id: string): Promise<void> {
-  saveLocalDeletedId(id); // fast, sync
-  await saveFirebaseDeletedProduct(id); // persistent across Vercel cold starts
-}
-
 // ── Products file helpers ────────────────────────────────────────────────────
 
 function readProductsFile(): Product[] {
@@ -132,7 +129,6 @@ function saveProductsFile(products: Product[]): void {
 function getOrInitProducts(deleted: Set<string>): Product[] {
   const stored = readProductsFile();
   if (stored.length > 0) return stored.filter((p) => !deleted.has(p.id));
-  // Bootstrap from sample products on first run
   const initial = INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
   saveProductsFile(initial);
   return initial;
@@ -140,7 +136,7 @@ function getOrInitProducts(deleted: Set<string>): Product[] {
 
 // ── Route handlers ───────────────────────────────────────────────────────────
 
-// GET /api/products — Returns all active products with deleted-IDs header
+// GET /api/products — Returns all active products from Firebase with deleted-IDs header
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const deletedSet = await getAllDeletedIds();
@@ -153,7 +149,24 @@ export async function GET(req: Request) {
     });
   }
 
-  const products = getOrInitProducts(deletedSet);
+  let products: Product[] = [];
+
+  // 1. Primary: Fetch live products from Firebase Realtime Database
+  try {
+    const fbProducts = await getFirebaseProducts();
+    if (Array.isArray(fbProducts) && fbProducts.length > 0) {
+      products = fbProducts.filter((p) => !deletedSet.has(p.id));
+      saveProductsFile(products);
+    }
+  } catch (err) {
+    console.warn("Firebase products fetch warning:", err);
+  }
+
+  // 2. Fallback to local cache if Firebase returned empty
+  if (products.length === 0) {
+    products = getOrInitProducts(deletedSet);
+  }
+
   const sorted = [...products].sort(
     (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
   );
@@ -166,7 +179,7 @@ export async function GET(req: Request) {
   });
 }
 
-// POST /api/products — Create or update a listing
+// POST /api/products — Create or update a listing in Firebase
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -174,7 +187,7 @@ export async function POST(req: Request) {
     const existing = getOrInitProducts(deletedSet);
 
     const id = body.id || `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    removeLocalDeletedId(id); // un-delete if re-listed
+    removeLocalDeletedId(id);
 
     const newProduct: Product = {
       ...body,
@@ -185,6 +198,10 @@ export async function POST(req: Request) {
       createdAt: body.createdAt || new Date().toISOString(),
     };
 
+    // Save directly to Firebase Realtime Database
+    await saveFirebaseProduct(newProduct);
+
+    // Also update local cache
     const filtered = existing.filter((p) => p.id !== newProduct.id);
     saveProductsFile([newProduct, ...filtered]);
 
@@ -210,19 +227,22 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 });
     }
 
-    // 1. Persist deletion in local file and update deleted set
+    // 1. Permanently delete from Firebase Realtime Database
+    await deleteFirebaseProduct(id);
+
+    // 2. Persist deletion in local file and update deleted set
     saveLocalDeletedId(id);
     const deletedSet = await getAllDeletedIds();
     deletedSet.add(id);
 
-    // 2. Remove from products.json and ensure no deleted products remain
+    // 3. Remove from products.json cache
     const stored = readProductsFile();
-    const sourceProducts = stored.length > 0 ? stored : INITIAL_SAMPLE_PRODUCTS;
+    const sourceProducts = stored.length > 0 ? stored : [];
     const deletedProd = sourceProducts.find((p) => p.id === id);
     const filtered = sourceProducts.filter((p) => !deletedSet.has(p.id) && p.id !== id);
     saveProductsFile(filtered);
 
-    // 3. Decrement seller's active listings in users.json if present
+    // 4. Decrement seller's active listings in users.json if present
     try {
       const USERS_FILE = path.join(getDataDir(), "users.json");
       if (fs.existsSync(USERS_FILE)) {
@@ -250,9 +270,6 @@ export async function DELETE(req: Request) {
         }
       }
     } catch {}
-
-    // 4. Non-blocking background sync to Firebase
-    saveFirebaseDeletedProduct(id).catch(() => {});
 
     const deletedList = Array.from(deletedSet);
     return NextResponse.json(

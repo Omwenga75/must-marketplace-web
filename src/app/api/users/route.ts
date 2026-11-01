@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { User, Product } from "@/types";
 import { isAdministratorEmail } from "@/lib/utils";
 import {
+  getFirebaseUsers,
+  getFirebaseUserById,
+  saveFirebaseUser,
+  deleteFirebaseUser,
   getFirebaseDeletedUserIds,
   saveFirebaseDeletedUser,
 } from "@/lib/firebase/admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-import os from "os";
 
 const REPO_DATA_DIR = path.join(process.cwd(), "data");
 
@@ -27,7 +30,14 @@ function getDataDir(): string {
     if (!fs.existsSync(tmpDataDir)) {
       try { fs.mkdirSync(tmpDataDir, { recursive: true }); } catch {}
     }
-    const files = ["products.json", "users.json", "conversations.json", "messages.json", "deleted_products.json", "deleted_users.json"];
+    const files = [
+      "products.json",
+      "users.json",
+      "conversations.json",
+      "messages.json",
+      "deleted_products.json",
+      "deleted_users.json",
+    ];
     files.forEach((f) => {
       const src = path.join(REPO_DATA_DIR, f);
       const dest = path.join(tmpDataDir, f);
@@ -81,11 +91,6 @@ async function getAllDeletedUserIds(): Promise<Set<string>> {
   return new Set([...local, ...remote]);
 }
 
-async function persistDeletedUserId(id: string): Promise<void> {
-  saveLocalDeletedUserId(id);
-  await saveFirebaseDeletedUser(id);
-}
-
 function removeLocalDeletedUserId(id: string): void {
   try {
     if (!id) return;
@@ -97,37 +102,16 @@ function removeLocalDeletedUserId(id: string): void {
   } catch {}
 }
 
-// ── Users file helpers ───────────────────────────────────────────────────────
+// ── Users file & Firebase sync helpers ───────────────────────────────────────
 
-async function ensureUsersFile(): Promise<User[]> {
-  const deleted = await getAllDeletedUserIds();
+function readLocalUsers(): User[] {
   try {
-    if (!fs.existsSync(getDataDir())) fs.mkdirSync(getDataDir(), { recursive: true });
-    if (!fs.existsSync(getUsersFilePath())) {
-      fs.writeFileSync(getUsersFilePath(), JSON.stringify([], null, 2), "utf8");
-      return [];
-    }
+    if (!fs.existsSync(getUsersFilePath())) return [];
     const raw = fs.readFileSync(getUsersFilePath(), "utf8");
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    // Filter: only @gmail.com or admin, and not deleted
-    const valid = parsed.filter((u: User) => {
-      if (!u || !u.email) return false;
-      const email = u.email.toLowerCase().trim();
-      if (deleted.has(u.id) || deleted.has(email)) return false;
-      if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
-      return email.endsWith("@gmail.com") || email === "must.market@admin.com";
-    });
-
-    if (valid.length !== parsed.length) {
-      saveUsersFile(valid);
-    }
-    return valid;
-  } catch (err) {
-    console.error("ensureUsersFile error:", err);
-    return [];
-  }
+    if (Array.isArray(parsed)) return parsed;
+  } catch {}
+  return [];
 }
 
 function saveUsersFile(users: User[]): void {
@@ -137,6 +121,47 @@ function saveUsersFile(users: User[]): void {
   } catch (err) {
     console.error("saveUsersFile error:", err);
   }
+}
+
+async function ensureUsersFile(): Promise<User[]> {
+  const deleted = await getAllDeletedUserIds();
+
+  // 1. Fetch live users from Firebase RTDB
+  let fbUsers: User[] = [];
+  try {
+    fbUsers = await getFirebaseUsers();
+  } catch (e) {
+    console.warn("Could not fetch users from Firebase RTDB:", e);
+  }
+
+  // 2. Read local cache
+  const localUsers = readLocalUsers();
+
+  // 3. Merge: Firebase is primary
+  const userMap = new Map<string, User>();
+  localUsers.forEach((u) => {
+    if (u && u.id && !deleted.has(u.id) && !deleted.has(u.email)) {
+      userMap.set(u.id, u);
+    }
+  });
+
+  fbUsers.forEach((u) => {
+    if (u && u.id && !deleted.has(u.id) && !deleted.has(u.email)) {
+      const prev = userMap.get(u.id);
+      userMap.set(u.id, { ...(prev || {}), ...u });
+    }
+  });
+
+  const merged = Array.from(userMap.values()).filter((u) => {
+    if (!u || !u.email) return false;
+    const email = u.email.toLowerCase().trim();
+    if (deleted.has(u.id) || deleted.has(email)) return false;
+    if (u.id?.startsWith("demo_") || u.id?.startsWith("new_user_")) return false;
+    return email.endsWith("@gmail.com") || email === "must.market@admin.com";
+  });
+
+  saveUsersFile(merged);
+  return merged;
 }
 
 function getStoredProducts(): Product[] {
@@ -174,6 +199,29 @@ export async function GET(req: Request) {
     return NextResponse.json(deletedArr, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
+  }
+
+  // Check specific user direct from Firebase first
+  if (idParam || emailParam) {
+    const lookupKey = idParam || emailParam || "";
+    try {
+      const directFb = await getFirebaseUserById(lookupKey);
+      if (directFb && !deletedSet.has(directFb.id) && !deletedSet.has(directFb.email)) {
+        const products = getStoredProducts();
+        const hasListings = userHasListings(directFb, products);
+        const isSeller = Boolean(directFb.seller || directFb.isSeller || hasListings);
+        const isAdmin = Boolean(directFb.admin || directFb.isAdmin || isAdministratorEmail(directFb.email));
+        return NextResponse.json(
+          { ...directFb, seller: isSeller, isSeller, admin: isAdmin, isAdmin },
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+              "X-Deleted-Users": JSON.stringify(deletedArr),
+            },
+          }
+        );
+      }
+    } catch {}
   }
 
   const users = await ensureUsersFile();
@@ -222,7 +270,7 @@ export async function GET(req: Request) {
   });
 }
 
-// POST /api/users — Create or merge user
+// POST /api/users — Create or merge user in Firebase
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Partial<User>;
@@ -295,7 +343,12 @@ export async function POST(req: Request) {
       users.push(updatedUser);
     }
 
+    // Save to Firebase Realtime Database
+    await saveFirebaseUser(updatedUser);
+
+    // Save to local cache
     saveUsersFile(users);
+
     return NextResponse.json(updatedUser, { status: 200 });
   } catch (err: any) {
     console.error("POST /api/users error:", err);
@@ -335,43 +388,46 @@ export async function PATCH(req: Request) {
 
     const isSellerRequested = body.seller === true || body.isSeller === true;
 
+    let updatedUser: User;
     if (existingIndex >= 0) {
       const prev = users[existingIndex];
       const isSeller = isSellerRequested || Boolean(prev.seller || prev.isSeller || userHasListings(prev, products));
-      const updatedUser: User = { ...prev, ...body, id: id || prev.id, seller: isSeller, isSeller };
+      updatedUser = { ...prev, ...body, id: id || prev.id, seller: isSeller, isSeller };
       users[existingIndex] = updatedUser;
-      saveUsersFile(users);
-      return NextResponse.json(updatedUser, { status: 200 });
+    } else {
+      const hasListings = userHasListings(body, products);
+      const isSeller = isSellerRequested || hasListings;
+      updatedUser = {
+        id: id || `u_${Date.now()}`,
+        fullName: body.fullName || "MUST User",
+        email: emailLower,
+        phone: body.phone || null,
+        location: body.location || "Main Gate",
+        profileImageUrl: body.profileImageUrl || null,
+        seller: isSeller,
+        isSeller,
+        admin: Boolean(body.admin || body.isAdmin),
+        isAdmin: Boolean(body.admin || body.isAdmin),
+        memberSince: String(Date.now()),
+        activeListings: body.activeListings || (hasListings ? 1 : 0),
+        soldItems: 0,
+        likes: 0,
+      };
+      users.push(updatedUser);
     }
 
-    const hasListings = userHasListings(body, products);
-    const isSeller = isSellerRequested || hasListings;
-    const newUser: User = {
-      id: id || `u_${Date.now()}`,
-      fullName: body.fullName || "MUST User",
-      email: emailLower,
-      phone: body.phone || null,
-      location: body.location || "Main Gate",
-      profileImageUrl: body.profileImageUrl || null,
-      seller: isSeller,
-      isSeller,
-      admin: Boolean(body.admin || body.isAdmin),
-      isAdmin: Boolean(body.admin || body.isAdmin),
-      memberSince: String(Date.now()),
-      activeListings: body.activeListings || (hasListings ? 1 : 0),
-      soldItems: 0,
-      likes: 0,
-    };
-    users.push(newUser);
+    // Save to Firebase Realtime Database
+    await saveFirebaseUser(updatedUser);
     saveUsersFile(users);
-    return NextResponse.json(newUser, { status: 200 });
+
+    return NextResponse.json(updatedUser, { status: 200 });
   } catch (err: any) {
     console.error("PATCH /api/users error:", err);
     return NextResponse.json({ error: err?.message || "Failed to patch user" }, { status: 500 });
   }
 }
 
-// DELETE /api/users — Permanently delete user account
+// DELETE /api/users — Permanently delete user account everywhere
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -386,47 +442,18 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 });
     }
 
+    // 1. Delete user from Firebase Realtime Database and cascade listing deletes
+    await deleteFirebaseUser(id);
+
+    // 2. Mark local tombstones
     const users = await ensureUsersFile();
     const target = users.find((u) => u.id === id || u.email === id);
-    if (target?.id) await persistDeletedUserId(target.id);
-    if (target?.email) await persistDeletedUserId(target.email);
-    await persistDeletedUserId(id);
+    if (target?.id) saveLocalDeletedUserId(target.id);
+    if (target?.email) saveLocalDeletedUserId(target.email);
+    saveLocalDeletedUserId(id);
 
     const filtered = users.filter((u) => u.id !== id && u.email !== id);
     saveUsersFile(filtered);
-
-    // Also remove any listings belonging to this user
-    try {
-      const storedProds = getStoredProducts();
-      const targetId = target?.id || id;
-      const targetEmail = target?.email?.toLowerCase().trim();
-      const targetPhone = target?.phone;
-      const targetName = target?.fullName?.toLowerCase().trim();
-
-      const userProds = storedProds.filter((p) => {
-        if (targetId && (p.sellerId === targetId || p.sellerId === `u_${targetId}`)) return true;
-        if (targetEmail && p.sellerName && targetEmail.includes(p.sellerName.toLowerCase().replace(/\s+/g, ""))) return true;
-        if (targetName && p.sellerName && p.sellerName.toLowerCase() === targetName) return true;
-        if (targetPhone && p.sellerPhone && p.sellerPhone === targetPhone) return true;
-        return false;
-      });
-
-      if (userProds.length > 0) {
-        const remainingProds = storedProds.filter((p) => !userProds.some((up) => up.id === p.id));
-        if (fs.existsSync(getDataDir())) {
-          fs.writeFileSync(getProductsFilePath(), JSON.stringify(remainingProds, null, 2), "utf8");
-          // Add to deleted products
-          const DELETED_PRODUCTS_FILE = path.join(getDataDir(), "deleted_products.json");
-          let delProds: string[] = [];
-          if (fs.existsSync(DELETED_PRODUCTS_FILE)) {
-            try { delProds = JSON.parse(fs.readFileSync(DELETED_PRODUCTS_FILE, "utf8")); } catch {}
-          }
-          const delSet = new Set(delProds);
-          userProds.forEach((up) => delSet.add(up.id));
-          fs.writeFileSync(DELETED_PRODUCTS_FILE, JSON.stringify([...delSet], null, 2), "utf8");
-        }
-      }
-    } catch {}
 
     const deletedSet = await getAllDeletedUserIds();
     const deletedArr = Array.from(deletedSet);
