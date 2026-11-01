@@ -527,36 +527,37 @@ export default function ProductDetailPage() {
       {/* Fullscreen Lightbox Modal */}
       {isFullscreen && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-200"
           onClick={() => setIsFullscreen(false)}
         >
-          {/* Top Bar with Counter and Close Button */}
+          {/* Top Bar */}
           <div
-            className="absolute top-0 inset-x-0 p-4 sm:p-6 flex items-center justify-between text-white z-50"
+            className="absolute top-0 inset-x-0 h-14 px-4 sm:px-6 flex items-center justify-between text-white z-50 bg-gradient-to-b from-black/80 to-transparent"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-sm font-semibold tracking-wide bg-white/10 px-3.5 py-1.5 rounded-full backdrop-blur-xs">
+            <div className="text-sm font-semibold tracking-wide bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-xs truncate max-w-[60%]">
               {product.title} • {selectedImageIndex + 1} of {images.length}
             </div>
-
             <button
               onClick={() => setIsFullscreen(false)}
-              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              className="p-2.5 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors cursor-pointer shrink-0"
               aria-label="Close fullscreen"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Centered Image */}
+          {/* Main Image Area — fills the whole screen minus top bar and bottom thumbs */}
           <div
-            className="relative max-w-5xl max-h-[80vh] w-full h-full flex items-center justify-center p-4 sm:p-8 select-none"
+            className="relative flex-1 flex items-center justify-center overflow-hidden"
+            style={{ paddingTop: "56px", paddingBottom: images.length > 1 ? "100px" : "20px" }}
             onClick={(e) => e.stopPropagation()}
           >
             <img
               src={activeImage}
               alt={product.title}
-              className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl"
+              className="w-full h-full object-contain select-none"
+              style={{ maxHeight: "100%", maxWidth: "100%" }}
             />
 
             {/* Lightbox Left Arrow */}
@@ -565,7 +566,7 @@ export default function ProductDetailPage() {
                 type="button"
                 onClick={handlePrevImage}
                 aria-label="Previous image"
-                className="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/10 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
               >
                 <ChevronLeft className="w-7 h-7 sm:w-8 sm:h-8" />
               </button>
@@ -577,7 +578,7 @@ export default function ProductDetailPage() {
                 type="button"
                 onClick={handleNextImage}
                 aria-label="Next image"
-                className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/10 hover:bg-white/25 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
               >
                 <ChevronRight className="w-7 h-7 sm:w-8 sm:h-8" />
               </button>
@@ -587,14 +588,14 @@ export default function ProductDetailPage() {
           {/* Lightbox Bottom Thumbnails */}
           {images.length > 1 && (
             <div
-              className="absolute bottom-6 inset-x-0 flex items-center justify-center gap-2 px-4 overflow-x-auto z-50"
+              className="absolute bottom-0 inset-x-0 h-[100px] flex items-center justify-center gap-2.5 px-6 overflow-x-auto z-50 bg-gradient-to-t from-black/80 to-transparent"
               onClick={(e) => e.stopPropagation()}
             >
               {images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`w-14 h-14 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                     selectedImageIndex === idx
                       ? "border-emerald-500 scale-110 shadow-lg ring-2 ring-emerald-500/40"
                       : "border-white/20 opacity-50 hover:opacity-100"
