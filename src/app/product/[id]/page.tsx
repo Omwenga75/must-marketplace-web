@@ -181,9 +181,11 @@ export default function ProductDetailPage() {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-pulse space-y-6">
         <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-28" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="h-[320px] sm:h-[380px] md:h-[420px] w-full bg-slate-200 dark:bg-slate-800 rounded-3xl" />
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          <div className="lg:col-span-6">
+            <div className="w-full max-w-[460px] aspect-square bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto lg:mx-0" />
+          </div>
+          <div className="lg:col-span-6 space-y-4">
             <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
             <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
             <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded" />
@@ -284,27 +286,17 @@ export default function ProductDetailPage() {
       {/* Main Grid: Gallery + Details */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
         {/* Left: Product Images Gallery with Scroll Arrows */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-6 space-y-4 flex flex-col items-center lg:items-start">
           <div
-            className="group relative h-[320px] sm:h-[380px] md:h-[420px] lg:h-[440px] w-full rounded-3xl overflow-hidden bg-slate-900/5 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none flex items-center justify-center"
+            className="group relative w-full max-w-[460px] aspect-square rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            {/* Ambient Blurred Background for Rich Color Fill */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <img
-                src={activeImage}
-                alt=""
-                aria-hidden="true"
-                className="w-full h-full object-cover blur-2xl opacity-25 dark:opacity-20 scale-125"
-              />
-            </div>
-
-            {/* Active Display Image - perfectly fitted without cropping */}
+            {/* Active Display Image */}
             <img
               src={activeImage}
               alt={product.title}
-              className="relative z-10 w-full h-full object-contain object-center cursor-zoom-in transition-all duration-300 drop-shadow-sm p-2 sm:p-3"
+              className="w-full h-full object-cover object-center cursor-zoom-in transition-all duration-300"
               onClick={() => setIsFullscreen(true)}
             />
 
@@ -314,9 +306,9 @@ export default function ProductDetailPage() {
                 type="button"
                 onClick={handlePrevImage}
                 aria-label="Previous image"
-                className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
+                className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
               >
-                <ChevronLeft className="w-6 h-6 transition-transform group-hover/arrow:-translate-x-0.5" />
+                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover/arrow:-translate-x-0.5" />
               </button>
             )}
 
@@ -326,9 +318,9 @@ export default function ProductDetailPage() {
                 type="button"
                 onClick={handleNextImage}
                 aria-label="Next image"
-                className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
+                className="absolute right-3 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
               >
-                <ChevronRight className="w-6 h-6 transition-transform group-hover/arrow:translate-x-0.5" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover/arrow:translate-x-0.5" />
               </button>
             )}
 
@@ -337,7 +329,7 @@ export default function ProductDetailPage() {
               type="button"
               onClick={() => setIsFullscreen(true)}
               aria-label="Expand photo"
-              className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-md hover:scale-105 transition-all cursor-pointer"
+              className="absolute top-3.5 right-3.5 z-20 p-2.5 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-md hover:scale-105 transition-all cursor-pointer"
               title="View full size"
             >
               <Maximize2 className="w-4 h-4" />
@@ -345,14 +337,14 @@ export default function ProductDetailPage() {
 
             {/* Image Counter Badge */}
             {images.length > 1 && (
-              <div className="absolute bottom-4 right-4 z-20 px-3 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-bold tracking-wider border border-white/10 shadow-sm pointer-events-none">
+              <div className="absolute bottom-3.5 right-3.5 z-20 px-3 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-bold tracking-wider border border-white/10 shadow-sm pointer-events-none">
                 {selectedImageIndex + 1} / {images.length}
               </div>
             )}
 
             {/* Bottom Dots Indicator */}
             {images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-sm">
+              <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-sm">
                 {images.map((_, idx) => (
                   <button
                     key={idx}
@@ -384,12 +376,12 @@ export default function ProductDetailPage() {
 
           {/* Thumbnails Row */}
           {images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2 pt-1 scrollbar-none">
+            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 w-full max-w-[460px] scrollbar-none">
               {images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
-                  className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
+                  className={`relative w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                     selectedImageIndex === idx
                       ? "border-emerald-600 scale-105 shadow-md ring-2 ring-emerald-500/20"
                       : "border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100"
@@ -403,7 +395,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Right: Product Details & Actions */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-6 space-y-6">
           <div className="space-y-3">
             {/* Condition & Category Badges */}
             <div className="flex items-center gap-2">
