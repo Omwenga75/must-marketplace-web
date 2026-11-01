@@ -63,13 +63,6 @@ function MessagesContent() {
   const searchParams = useSearchParams();
   const { user, loading: authLoading, loginAsDemoUser } = useAuth();
 
-  // Redirect admins away from regular user chats to admin portal
-  useEffect(() => {
-    if (!authLoading && user && (user.isAdmin || user.admin || isAdministratorEmail(user.email))) {
-      router.replace("/admin");
-    }
-  }, [authLoading, user, router]);
-
   // Query parameters when arriving from a product page
   const sellerIdQuery = searchParams.get("sellerId");
   const sellerNameQuery = searchParams.get("sellerName");

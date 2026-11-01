@@ -9,13 +9,8 @@ import { UNIVERSITY_LOCATIONS } from "@/lib/constants";
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on chat, messaging, and admin console screens for a dedicated viewport experience
-  if (
-    pathname === "/messages" ||
-    pathname?.startsWith("/messages/") ||
-    pathname === "/admin" ||
-    pathname?.startsWith("/admin/")
-  ) {
+  // Hide footer on chat and messaging screens for a dedicated viewport experience
+  if (pathname === "/messages" || pathname?.startsWith("/messages/")) {
     return null;
   }
 

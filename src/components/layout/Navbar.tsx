@@ -358,34 +358,15 @@ export default function Navbar() {
                       </div>
                     </div>
 
-                    {isUserAdmin ? (
-                      <>
-                        <Link
-                          href="/admin"
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-secondary font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/40"
-                        >
-                          <ShieldCheck className="w-4 h-4 text-secondary" />
-                          <span>Admin Portal</span>
-                        </Link>
-                        <Link
-                          href="/profile"
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <User className="w-4 h-4 text-slate-400" />
-                          <span>My Profile</span>
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        <Link
-                          href="/profile"
-                          className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-                        >
-                          <User className="w-4 h-4 text-slate-400" />
-                          <span>My Profile</span>
-                        </Link>
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <User className="w-4 h-4 text-slate-400" />
+                      <span>My Profile</span>
+                    </Link>
 
-                        {user.isSeller ? (
+                    {user.isSeller ? (
                           <Link
                             href="/seller/dashboard"
                             className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -410,8 +391,6 @@ export default function Navbar() {
                           <Heart className="w-4 h-4 text-rose-500" />
                           <span>Saved Products ({mounted ? favoriteIds.size : 0})</span>
                         </Link>
-                      </>
-                    )}
 
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
@@ -522,23 +501,13 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  {isUserAdmin ? (
-                    <Link
-                      href="/admin"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="px-3 py-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-secondary font-semibold"
-                    >
-                      Admin Portal
-                    </Link>
-                  ) : (
-                    <Link
-                      href={user.isSeller ? "/seller/dashboard" : "/seller/activate"}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold"
-                    >
-                      {user.isSeller ? "Dashboard" : "Become a Seller"}
-                    </Link>
-                  )}
+                  <Link
+                    href={user.isSeller ? "/seller/dashboard" : "/seller/activate"}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-semibold"
+                  >
+                    {user.isSeller ? "Dashboard" : "Become a Seller"}
+                  </Link>
                 </>
               ) : loading ? null : (
                 <div className="grid grid-cols-2 gap-2 pt-2">
@@ -607,36 +576,22 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {isUserAdmin ? (
-          <Link
-            href="/admin"
-            className={`flex flex-col items-center gap-0.5 p-1 relative ${
-              pathname?.startsWith("/admin")
-                ? "text-emerald-600 dark:text-emerald-400 font-bold"
-                : ""
-            }`}
-          >
-            <ShieldCheck className="w-5 h-5 text-secondary" />
-            <span>Admin</span>
-          </Link>
-        ) : (
-          <Link
-            href="/messages"
-            className={`flex flex-col items-center gap-0.5 p-1 relative ${
-              pathname?.startsWith("/messages")
-                ? "text-emerald-600 dark:text-emerald-400 font-bold"
-                : ""
-            }`}
-          >
-            <MessageCircle className="w-5 h-5" />
-            {unreadMessages > 0 && (
-              <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-secondary text-white text-[9px] font-bold flex items-center justify-center">
-                {unreadMessages}
-              </span>
-            )}
-            <span>Chats</span>
-          </Link>
-        )}
+        <Link
+          href="/messages"
+          className={`flex flex-col items-center gap-0.5 p-1 relative ${
+            pathname?.startsWith("/messages")
+              ? "text-emerald-600 dark:text-emerald-400 font-bold"
+              : ""
+          }`}
+        >
+          <MessageCircle className="w-5 h-5" />
+          {unreadMessages > 0 && (
+            <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-secondary text-white text-[9px] font-bold flex items-center justify-center">
+              {unreadMessages}
+            </span>
+          )}
+          <span>Chats</span>
+        </Link>
 
         <Link
           href={!mounted ? "/login" : user ? "/profile" : "/login"}

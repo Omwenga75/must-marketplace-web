@@ -351,13 +351,6 @@ export default function NotificationsPage() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // If administrator visits user-side notifications, redirect to admin portal notifications
-  useEffect(() => {
-    if (!authLoading && user && (user.isAdmin || user.admin || isAdministratorEmail(user.email))) {
-      router.replace("/admin#notifications");
-    }
-  }, [user, authLoading, router]);
-
   // Prevent background scrolling when mobile drawer is open
   useEffect(() => {
     if (drawerOpen) {
