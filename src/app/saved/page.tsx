@@ -63,9 +63,9 @@ export default function SavedItemsPage() {
   const savedProducts = allProducts.filter((p) => favoriteIds.has(p.id));
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-6 sm:py-10 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 sm:pt-3 pb-6 sm:pb-10 space-y-4 sm:space-y-5">
       {/* Header with Item Count */}
-      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-5">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 sm:pb-4">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
