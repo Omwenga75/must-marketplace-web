@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,13 +13,8 @@ import {
   ArrowLeft,
   Eye,
   Calendar,
-  Sparkles,
   Check,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  X,
 } from "lucide-react";
 import { Product } from "@/types";
 import { getProductById, recordProductView, getProductLikes } from "@/lib/firebase/services";
@@ -41,8 +36,7 @@ export default function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedShare, setCopiedShare] = useState(false);
   const [likesCount, setLikesCount] = useState<number>(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (product) {
@@ -77,7 +71,6 @@ export default function ProductDetailPage() {
       .then((data) => {
         setProduct(data);
         setLoading(false);
-        // Record product view
         if (data && user?.id) {
           recordProductView(data.id, user.id);
         }
@@ -122,60 +115,20 @@ export default function ProductDetailPage() {
   const fallbackImg =
     CATEGORY_FALLBACK_IMAGES[product?.category?.id || "1"] ||
     "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800";
-  const images = product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : [fallbackImg];
+  const images =
+    product?.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : [fallbackImg];
   const activeImage = images[selectedImageIndex] || fallbackImg;
 
-  // Previous and Next scroll navigation handlers
-  const handlePrevImage = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setSelectedImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-  };
-
-  const handleNextImage = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setSelectedImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-  };
-
-  // Keyboard navigation for image gallery
+  // Auto-scroll every 5 seconds
   useEffect(() => {
     if (images.length <= 1) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        setSelectedImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-      } else if (e.key === "ArrowRight") {
-        setSelectedImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-      } else if (e.key === "Escape") {
-        setIsFullscreen(false);
-      }
+    timerRef.current = setInterval(() => {
+      setSelectedImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+    }, 5000);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [images.length]);
-
-  // Touch swipe support for mobile
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.touches[0].clientX);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
-    if (diff > 45) {
-      // Swiped left -> next
-      handleNextImage();
-    } else if (diff < -45) {
-      // Swiped right -> prev
-      handlePrevImage();
-    }
-    setTouchStartX(null);
-  };
 
   if (loading) {
     return (
@@ -232,7 +185,6 @@ export default function ProductDetailPage() {
       router.push(`/login?redirect=/product/${product.id}`);
       return;
     }
-    // Navigate to messages with pre-attached product context
     const sellerId = product.sellerId || "demo_seller_456";
     const sellerName = product.sellerName || "Seller";
     router.push(
@@ -246,7 +198,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8">
-      {/* Top Breadcrumb & Navigation */}
+      {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
@@ -275,7 +227,6 @@ export default function ProductDetailPage() {
                 ? "bg-rose-50 text-rose-600 border-rose-300 dark:bg-rose-950/40 dark:border-rose-900 shadow-xs"
                 : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800"
             }`}
-            title={favorited ? "Unlike listing" : "Like & Save listing"}
           >
             <Heart className={`w-4 h-4 transition-transform active:scale-125 ${favorited ? "fill-rose-500 text-rose-500" : ""}`} />
             <span>{likesCount} {likesCount === 1 ? "Like" : "Likes"}</span>
@@ -283,84 +234,38 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Main Grid: Gallery + Details */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-        {/* Left: Product Images Gallery with Scroll Arrows */}
+        {/* Left: Gallery with Auto-scroll */}
         <div className="lg:col-span-6 space-y-4 flex flex-col items-center lg:items-start">
-          <div
-            className="group relative w-full max-w-[460px] aspect-square rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* Active Display Image */}
+          <div className="relative w-full max-w-[460px] aspect-square rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm select-none">
+            {/* Auto-scrolling Image */}
             <img
               src={activeImage}
               alt={product.title}
-              className="w-full h-full object-cover object-center cursor-zoom-in transition-all duration-300"
-              onClick={() => setIsFullscreen(true)}
+              className="w-full h-full object-cover object-center transition-all duration-700 ease-in-out"
             />
 
-            {/* Left Scroll Arrow */}
+            {/* Dots Indicator */}
             {images.length > 1 && (
-              <button
-                type="button"
-                onClick={handlePrevImage}
-                aria-label="Previous image"
-                className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
-              >
-                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover/arrow:-translate-x-0.5" />
-              </button>
-            )}
-
-            {/* Right Scroll Arrow */}
-            {images.length > 1 && (
-              <button
-                type="button"
-                onClick={handleNextImage}
-                aria-label="Next image"
-                className="absolute right-3 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-xl flex items-center justify-center transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer group/arrow"
-              >
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 transition-transform group-hover/arrow:translate-x-0.5" />
-              </button>
-            )}
-
-            {/* Fullscreen Expand Action */}
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(true)}
-              aria-label="Expand photo"
-              className="absolute top-3.5 right-3.5 z-20 p-2.5 rounded-full bg-slate-900/65 hover:bg-slate-900/90 text-white backdrop-blur-md border border-white/20 shadow-md hover:scale-105 transition-all cursor-pointer"
-              title="View full size"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-
-            {/* Image Counter Badge */}
-            {images.length > 1 && (
-              <div className="absolute bottom-3.5 right-3.5 z-20 px-3 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-bold tracking-wider border border-white/10 shadow-sm pointer-events-none">
-                {selectedImageIndex + 1} / {images.length}
-              </div>
-            )}
-
-            {/* Bottom Dots Indicator */}
-            {images.length > 1 && (
-              <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-sm">
+              <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-sm pointer-events-none">
                 {images.map((_, idx) => (
-                  <button
+                  <span
                     key={idx}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImageIndex(idx);
-                    }}
-                    aria-label={`Go to image ${idx + 1}`}
-                    className={`rounded-full transition-all cursor-pointer ${
+                    className={`rounded-full transition-all duration-300 ${
                       selectedImageIndex === idx
-                        ? "w-6 h-1.5 bg-white shadow-xs"
-                        : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
+                        ? "w-6 h-1.5 bg-white"
+                        : "w-1.5 h-1.5 bg-white/50"
                     }`}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* Image Counter */}
+            {images.length > 1 && (
+              <div className="absolute bottom-3.5 right-3.5 z-20 px-3 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-bold tracking-wider border border-white/10 shadow-sm pointer-events-none">
+                {selectedImageIndex + 1} / {images.length}
               </div>
             )}
 
@@ -374,13 +279,20 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Thumbnails Row */}
+          {/* Thumbnail Row */}
           {images.length > 1 && (
-            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 w-full max-w-[460px] scrollbar-none">
+            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 w-full max-w-[460px]">
               {images.map((img, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setSelectedImageIndex(idx)}
+                  onClick={() => {
+                    setSelectedImageIndex(idx);
+                    // Reset timer on manual selection
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    timerRef.current = setInterval(() => {
+                      setSelectedImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+                    }, 5000);
+                  }}
                   className={`relative w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                     selectedImageIndex === idx
                       ? "border-emerald-600 scale-105 shadow-md ring-2 ring-emerald-500/20"
@@ -394,10 +306,10 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        {/* Right: Product Details & Actions */}
+        {/* Right: Details */}
         <div className="lg:col-span-6 space-y-6">
           <div className="space-y-3">
-            {/* Condition & Category Badges */}
+            {/* Badges */}
             <div className="flex items-center gap-2">
               <span
                 className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wide ${
@@ -408,7 +320,6 @@ export default function ProductDetailPage() {
               >
                 {product.condition === "NEW" ? "Brand New" : "Second Hand"}
               </span>
-
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                 {product.category?.icon} {product.category?.name}
               </span>
@@ -420,11 +331,11 @@ export default function ProductDetailPage() {
             </h1>
 
             {/* Price */}
-            <div className="text-3xl font-black text-slate-900 dark:text-white flex items-baseline gap-2">
-              <span>{formatPrice(product.price)}</span>
+            <div className="text-3xl font-black text-slate-900 dark:text-white">
+              {formatPrice(product.price)}
             </div>
 
-            {/* Location & Metadata */}
+            {/* Metadata */}
             <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
               <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
                 <MapPin className="w-4 h-4 text-secondary shrink-0" />
@@ -442,7 +353,6 @@ export default function ProductDetailPage() {
                     ? "text-rose-600 dark:text-rose-400"
                     : "text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
                 }`}
-                title={favorited ? "Unlike listing" : "Like listing"}
               >
                 <Heart className={`w-4 h-4 transition-transform active:scale-125 ${favorited ? "fill-rose-500 text-rose-500" : "text-slate-400"}`} />
                 <span>{likesCount} {likesCount === 1 ? "like" : "likes"}</span>
@@ -454,7 +364,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Primary Action Buttons */}
+          {/* Actions */}
           <div className="space-y-3 pt-2">
             <button
               onClick={handleChatWithSeller}
@@ -489,7 +399,7 @@ export default function ProductDetailPage() {
             </p>
           </div>
 
-          {/* Seller Profile Card */}
+          {/* Seller */}
           <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               About the Seller
@@ -510,7 +420,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Safety Notice Banner */}
+          {/* Safety */}
           <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1">
             <p className="font-bold flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-secondary" />
@@ -523,91 +433,6 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Fullscreen Lightbox Modal */}
-      {isFullscreen && (
-        <div
-          className="fixed inset-0 z-50 bg-black flex flex-col animate-in fade-in duration-200"
-          onClick={() => setIsFullscreen(false)}
-        >
-          {/* Top Bar */}
-          <div
-            className="absolute top-0 inset-x-0 h-14 px-4 sm:px-6 flex items-center justify-between text-white z-50 bg-gradient-to-b from-black/80 to-transparent"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-sm font-semibold tracking-wide bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-xs truncate max-w-[60%]">
-              {product.title} • {selectedImageIndex + 1} of {images.length}
-            </div>
-            <button
-              onClick={() => setIsFullscreen(false)}
-              className="p-2.5 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors cursor-pointer shrink-0"
-              aria-label="Close fullscreen"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Main Image Area — fills the whole screen minus top bar and bottom thumbs */}
-          <div
-            className="relative flex-1 flex items-center justify-center overflow-hidden"
-            style={{ paddingTop: "56px", paddingBottom: images.length > 1 ? "100px" : "20px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={activeImage}
-              alt={product.title}
-              className="w-full h-full object-contain select-none"
-              style={{ maxHeight: "100%", maxWidth: "100%" }}
-            />
-
-            {/* Lightbox Left Arrow */}
-            {images.length > 1 && (
-              <button
-                type="button"
-                onClick={handlePrevImage}
-                aria-label="Previous image"
-                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
-              >
-                <ChevronLeft className="w-7 h-7 sm:w-8 sm:h-8" />
-              </button>
-            )}
-
-            {/* Lightbox Right Arrow */}
-            {images.length > 1 && (
-              <button
-                type="button"
-                onClick={handleNextImage}
-                aria-label="Next image"
-                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md border border-white/20 shadow-2xl transition-all hover:scale-110 active:scale-95 cursor-pointer"
-              >
-                <ChevronRight className="w-7 h-7 sm:w-8 sm:h-8" />
-              </button>
-            )}
-          </div>
-
-          {/* Lightbox Bottom Thumbnails */}
-          {images.length > 1 && (
-            <div
-              className="absolute bottom-0 inset-x-0 h-[100px] flex items-center justify-center gap-2.5 px-6 overflow-x-auto z-50 bg-gradient-to-t from-black/80 to-transparent"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedImageIndex(idx)}
-                  className={`w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
-                    selectedImageIndex === idx
-                      ? "border-emerald-500 scale-110 shadow-lg ring-2 ring-emerald-500/40"
-                      : "border-white/20 opacity-50 hover:opacity-100"
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
