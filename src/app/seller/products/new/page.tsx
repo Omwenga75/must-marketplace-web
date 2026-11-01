@@ -158,7 +158,7 @@ export default function NewProductPage() {
             ];
 
       const created = await createProduct({
-        title: title.trim(),
+        title: title.trim().slice(0, 18),
         description:
           description.trim() ||
           `${selectedCategory.name} in ${
@@ -315,16 +315,16 @@ export default function NewProductPage() {
             {/* Title */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                <span>Title *</span>
+                <span>Item / Business Name *</span>
                 <span className="text-[10px] text-slate-400 font-normal">
-                  {title.length}/80 characters
+                  {title.length}/18 characters
                 </span>
               </label>
               <input
                 type="text"
                 required
-                maxLength={80}
-                placeholder="e.g. HP Laptop 15 Core i5 8GB RAM 256GB SSD"
+                maxLength={18}
+                placeholder="e.g. Joanne's Refreshes"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium transition-all"
@@ -570,20 +570,24 @@ export default function NewProductPage() {
               </div>
 
               {/* Product Card Content */}
-              <div className="p-4 space-y-2.5">
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="text-sm font-black text-slate-900 dark:text-white line-clamp-1">
-                    {title || "Your Product Title"}
-                  </h4>
-                </div>
-
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                    {formatPrice(numericPrice || 0)}
+              <div className="p-3 sm:p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                  <span className="font-medium truncate">
+                    {selectedCategory.icon || "📦"} {selectedCategory.name}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <MapPin className="w-3 h-3 text-secondary" />
                     <span>{location}</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                    {title ? (title.length > 18 ? title.slice(0, 18) : title) : "Item / BS Name"}
+                  </h4>
+                  <span className="text-slate-400 dark:text-slate-600 font-normal shrink-0">|</span>
+                  <span className="text-sm font-black text-slate-900 dark:text-white shrink-0">
+                    {formatPrice(numericPrice || 0)}
                   </span>
                 </div>
 

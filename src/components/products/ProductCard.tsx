@@ -87,6 +87,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const isSold = product.status === "SOLD";
   const isBooked = product.status === "BOOKED";
 
+  // Limit item/business title to 18 characters maximum
+  const rawTitle = product.title || "";
+  const displayTitle = rawTitle.length > 18 ? rawTitle.slice(0, 18).trim() : rawTitle;
+
   return (
     <div className="group relative flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-card hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200">
       {/* Classic Square Thumbnail */}
@@ -174,8 +178,8 @@ export default function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Card Info */}
-      <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1.5 gap-2">
+      <div className="flex flex-1 flex-col p-3 sm:p-3.5">
+        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1 gap-2">
           <span className="font-medium truncate">
             {product.category?.icon || "📦"} {product.category?.name || "General"}
           </span>
@@ -187,20 +191,19 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <Link
           href={`/product/${product.id}`}
-          className="group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors"
+          title={product.title}
+          className="group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors block mt-0.5"
         >
-          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
-            {product.title}
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 min-w-0">
+            <span className="truncate">{displayTitle}</span>
+            <span className="text-slate-300 dark:text-slate-600 font-normal shrink-0">|</span>
+            <span className="font-black text-slate-900 dark:text-white shrink-0">
+              {formatPrice(product.price)}
+            </span>
           </h3>
         </Link>
 
-        <div className="mt-1">
-          <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            {formatPrice(product.price)}
-          </span>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+        <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-1.5 min-w-0">
             <div className="w-5 h-5 rounded-full bg-primary-container text-primary-dark font-bold text-[10px] flex items-center justify-center shrink-0">
               {product.sellerName ? product.sellerName.charAt(0) : "S"}
