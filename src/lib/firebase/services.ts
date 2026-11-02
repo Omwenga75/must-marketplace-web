@@ -10,6 +10,7 @@ import {
   query,
   orderByChild,
   equalTo,
+  runTransaction,
 } from "firebase/database";
 import {
   ref as storageRef,
@@ -471,17 +472,21 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function recordProductView(productId: string, userId?: string) {
-  if (!database || !userId) return;
+  if (!database || !userId || !productId) return;
   try {
+    // Guard: 1 view per user per product (stored in product_views/{productId}/{userId})
     const viewRef = ref(database, `product_views/${productId}/${userId}`);
     const snapshot = await get(viewRef);
-    if (!snapshot.exists()) {
-      await set(viewRef, true);
-      const likesRef = ref(database, `products/${productId}/views`);
-      const currentViewsSnap = await get(likesRef);
-      const currentViews = (currentViewsSnap.val() as number) || 0;
-      await set(likesRef, currentViews + 1);
-    }
+    if (snapshot.exists()) return; // already recorded for this user
+
+    // Mark as viewed by this user first (idempotent guard)
+    await set(viewRef, true);
+
+    // Atomically increment views using a transaction to prevent race conditions
+    const viewsCountRef = ref(database, `products/${productId}/views`);
+    await runTransaction(viewsCountRef, (current) => {
+      return (typeof current === "number" ? current : 0) + 1;
+    });
   } catch (err) {
     console.warn("Failed to record product view in Firebase:", err);
   }
@@ -551,15 +556,32 @@ export async function toggleFavorite(productId: string, userId?: string): Promis
     } catch {}
   }
 
-  // 4. Background Firebase sync (timeout 500ms, non-blocking)
+  // 4. Background Firebase sync: atomic like count transaction + per-user guard
   if (database && userId) {
     const fbPromise = (async () => {
       try {
+        // Per-user like guard stored at favorites/{userId}/{productId}
         const favRef = ref(database, `favorites/${userId}/${productId}`);
-        if (isNowFavorited) {
+        const snap = await get(favRef);
+        const alreadyLiked = snap.exists() && snap.val() === true;
+
+        if (isNowFavorited && !alreadyLiked) {
+          // Mark as liked by this user
           await set(favRef, true);
-        } else {
+          // Atomically increment likes count
+          const likesRef = ref(database, `products/${productId}/likes`);
+          await runTransaction(likesRef, (current) => {
+            return (typeof current === "number" ? current : 0) + 1;
+          });
+        } else if (!isNowFavorited && alreadyLiked) {
+          // Remove like
           await remove(favRef);
+          // Atomically decrement likes count (floor at 0)
+          const likesRef = ref(database, `products/${productId}/likes`);
+          await runTransaction(likesRef, (current) => {
+            const n = typeof current === "number" ? current : 0;
+            return Math.max(0, n - 1);
+          });
         }
       } catch {}
     })();

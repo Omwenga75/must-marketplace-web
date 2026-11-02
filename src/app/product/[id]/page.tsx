@@ -72,8 +72,25 @@ export default function ProductDetailPage() {
         setProduct(data);
         document.title = `${data.title} | Ksh ${data.price}`;
         setLoading(false);
-        if (data && user?.id) {
-          recordProductView(data.id, user.id);
+        if (data) {
+          if (user?.id) {
+            // Authenticated: 1 view per account (enforced in Firebase via product_views/{productId}/{userId})
+            recordProductView(data.id, user.id);
+          } else {
+            // Guest: 1 view per browser session using sessionStorage guard
+            const sessionKey = `must_view_${data.id}`;
+            if (typeof sessionStorage !== "undefined" && !sessionStorage.getItem(sessionKey)) {
+              sessionStorage.setItem(sessionKey, "1");
+              // Use a session-scoped pseudo-ID so Firebase deduplicates per device session
+              const sessionId = `guest_${(() => {
+                const k = "must_guest_session_id";
+                let g = sessionStorage.getItem(k);
+                if (!g) { g = "g_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); sessionStorage.setItem(k, g); }
+                return g;
+              })()}`;
+              recordProductView(data.id, sessionId);
+            }
+          }
         }
       })
       .catch(() => {

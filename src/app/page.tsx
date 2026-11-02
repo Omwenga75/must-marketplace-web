@@ -116,7 +116,11 @@ export default function HomePage() {
     return (b.views || 0) + (b.likes || 0) - ((a.views || 0) + (a.likes || 0));
   });
 
-  const featuredProducts = sortedByPopular.slice(0, 4);
+  // Featured = top items with real engagement (at least 1 view or like), fallback to newest
+  const engagedProducts = sortedByPopular.filter(p => ((p.views || 0) + (p.likes || 0)) > 0);
+  const featuredProducts = engagedProducts.length >= 2
+    ? engagedProducts.slice(0, 4)
+    : sortedByPopular.slice(0, 4); // fallback if not enough engaged items yet
   const recentProducts = sortedByRecent.slice(0, 4);
 
   const getCategoryCount = (catId: string) => {
@@ -209,7 +213,19 @@ export default function HomePage() {
 
                 {/* Preview Mini Carousel / Product Sample */}
                 <div className="mt-4 space-y-3">
-                  {products.slice(0, 3).map((item) => {
+                  {(() => {
+                  // "Live Campus Deals" = top 3 by engagement (views + likes), must have at least 1 view OR 1 like
+                  const engaged = [...products]
+                    .filter(p => (p.status || 'ACTIVE').toUpperCase() === 'ACTIVE' && ((p.views || 0) + (p.likes || 0)) > 0)
+                    .sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0)))
+                    .slice(0, 3);
+                  // If fewer than 3 engaged items, fill with newest active items (so widget is never empty)
+                  const fallback = products
+                    .filter(p => (p.status || 'ACTIVE').toUpperCase() === 'ACTIVE' && !engaged.find(e => e.id === p.id))
+                    .slice(0, 3 - engaged.length);
+                  const dealsToShow = [...engaged, ...fallback].slice(0, 3);
+                  return dealsToShow;
+                })().map((item) => {
                     const fallbackImg =
                       CATEGORY_FALLBACK_IMAGES[item.category?.id || "1"] ||
                       "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800";
