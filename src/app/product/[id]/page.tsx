@@ -407,11 +407,10 @@ export default function ProductDetailPage() {
           <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1">
             <p className="font-bold flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-secondary" />
-              <span>Campus Safety Guidelines</span>
+              <span>Campus Security Notice</span>
             </p>
             <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-              Always meet in busy campus spaces such as the Library Foyer, Student Center, or Gate
-              A. Inspect and test items before making payments.
+              Always meet at public places and inspect the items before paying for them.
             </p>
           </div>
         </div>

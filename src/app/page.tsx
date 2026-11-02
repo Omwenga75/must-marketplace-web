@@ -388,8 +388,7 @@ export default function HomePage() {
               </div>
               <h3 className="font-bold text-base text-white">Find What You Need</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Filter by condition (New or Second Hand), category, and campus hostels (Main Gate,
-                Nchiru, California, Mascan).
+                Filter by condition, category, or other to explore items available for you.
               </p>
             </div>
 
@@ -412,8 +411,7 @@ export default function HomePage() {
               </div>
               <h3 className="font-bold text-base text-white">Meet On-Campus & Transact</h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Inspect the item at the Library Foyer, Student Center, or Gate A. Pay via M-Pesa once
-                you're fully satisfied.
+                Always meet at public places and inspect the items before paying for them.
               </p>
             </div>
           </div>
@@ -428,8 +426,7 @@ export default function HomePage() {
               Have something to sell?
             </h3>
             <p className="text-emerald-100 text-xs sm:text-sm max-w-lg">
-              Declutter your room or house, sell your textbooks to junior students, and make instant cash. Activate your
-              seller profile in under 30 seconds.
+              Do you have something to sell? Click 'Become a Seller' to create a seller dashboard and start selling.
             </p>
           </div>
           <Link

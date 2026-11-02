@@ -38,7 +38,7 @@ export default function Footer() {
             </p>
             <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 bg-primary/80 dark:bg-emerald-950/60 px-3 py-1.5 rounded-full border border-primary-container dark:border-emerald-800 w-fit">
               <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-              <span>Safety Tip: Inspect items before paying.</span>
+              <span>Campus Security Notice: Always meet at public places and inspect the items before paying for them.</span>
             </div>
           </div>
 

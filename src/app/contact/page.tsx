@@ -104,7 +104,7 @@ export default function ContactPage() {
               <span>Campus Security Notice</span>
             </div>
             <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-              For your safety, always meet buyers and sellers during day-time hours at open places like Main Gate.
+              Always meet at public places and inspect the items before paying for them.
             </p>
           </div>
         </div>
