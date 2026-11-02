@@ -6,6 +6,18 @@
       ".read": true,
       ".write": "auth != null"
     },
+    "favorites": {
+      ".read": true,
+      ".write": true
+    },
+    "product_likes": {
+      ".read": true,
+      ".write": true
+    },
+    "product_views": {
+      ".read": true,
+      ".write": true
+    },
     "deleted_products": {
       ".read": true,
       ".write": "auth != null"

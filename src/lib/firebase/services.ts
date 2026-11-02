@@ -449,27 +449,36 @@ export async function recordProductView(productId: string, userId?: string) {
   }
 }
 
-export async function toggleFavorite(productId: string, userId?: string): Promise<boolean> {
+export async function toggleFavorite(
+  productId: string,
+  userId?: string,
+  explicitTargetState?: boolean
+): Promise<boolean> {
   if (!productId) return false;
   if (!userId) {
     // 1 Account = 1 Like: Must be signed in to like items!
     return false;
   }
 
-  if (!database) return false;
+  if (!database) return typeof explicitTargetState === "boolean" ? explicitTargetState : false;
 
   try {
     const prodLikeRef = ref(database, `product_likes/${productId}/${userId}`);
     const favRef = ref(database, `favorites/${userId}/${productId}`);
 
-    const [prodLikeSnap, favSnap] = await Promise.all([
-      get(prodLikeRef),
-      get(favRef),
-    ]);
-    const currentlyLiked =
-      (prodLikeSnap.exists() && prodLikeSnap.val() === true) ||
-      (favSnap.exists() && favSnap.val() === true);
-    const isNowLiked = !currentlyLiked;
+    let isNowLiked: boolean;
+    if (typeof explicitTargetState === "boolean") {
+      isNowLiked = explicitTargetState;
+    } else {
+      const [prodLikeSnap, favSnap] = await Promise.all([
+        get(prodLikeRef),
+        get(favRef),
+      ]);
+      const currentlyLiked =
+        (prodLikeSnap.exists() && prodLikeSnap.val() === true) ||
+        (favSnap.exists() && favSnap.val() === true);
+      isNowLiked = !currentlyLiked;
+    }
 
     if (isNowLiked) {
       await Promise.all([
@@ -513,7 +522,8 @@ export async function toggleFavorite(productId: string, userId?: string): Promis
     return isNowLiked;
   } catch (err) {
     console.error("toggleFavorite error:", err);
-    return false;
+    // Return explicitTargetState if provided so UI does not abruptly revert
+    return typeof explicitTargetState === "boolean" ? explicitTargetState : false;
   }
 }
 
