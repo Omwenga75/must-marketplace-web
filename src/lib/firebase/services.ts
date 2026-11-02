@@ -480,38 +480,44 @@ export async function toggleFavorite(
       isNowLiked = !currentlyLiked;
     }
 
-    if (isNowLiked) {
-      await Promise.all([
-        set(prodLikeRef, true),
-        set(favRef, true),
-      ]);
-    } else {
-      await Promise.all([
-        remove(prodLikeRef),
-        remove(favRef),
-      ]);
-    }
-
-    // Authoritative unique account count: exactly 1 account = 1 like (no leakage/drift/infinite increments)
-    const allLikesSnap = await get(ref(database, `product_likes/${productId}`));
     let trueLikesCount = 0;
-    if (allLikesSnap.exists()) {
-      const val = allLikesSnap.val();
-      if (val && typeof val === "object") {
-        trueLikesCount = Object.keys(val).filter((k) => val[k] === true).length;
+    try {
+      if (isNowLiked) {
+        await Promise.all([
+          set(prodLikeRef, true),
+          set(favRef, true),
+        ]);
+      } else {
+        await Promise.all([
+          remove(prodLikeRef),
+          remove(favRef),
+        ]);
       }
-    }
 
-    // Set the EXACT true count on products/${productId}/likes
-    await set(ref(database, `products/${productId}/likes`), trueLikesCount);
+      // Authoritative unique account count: exactly 1 account = 1 like (no leakage/drift/infinite increments)
+      const allLikesSnap = await get(ref(database, `product_likes/${productId}`));
+      if (allLikesSnap.exists()) {
+        const val = allLikesSnap.val();
+        if (val && typeof val === "object") {
+          trueLikesCount = Object.keys(val).filter((k) => val[k] === true).length;
+        }
+      }
+
+      // Set the EXACT true count on products/${productId}/likes
+      await set(ref(database, `products/${productId}/likes`), trueLikesCount);
+    } catch (fbErr) {
+      console.warn("Firebase like write warning:", fbErr);
+    }
 
     // Dispatch real-time events across components in the current window
     if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("must_product_likes_changed", {
-          detail: { productId, likes: trueLikesCount },
-        })
-      );
+      if (trueLikesCount > 0) {
+        window.dispatchEvent(
+          new CustomEvent("must_product_likes_changed", {
+            detail: { productId, likes: trueLikesCount },
+          })
+        );
+      }
       window.dispatchEvent(
         new CustomEvent("must_favorites_updated", {
           detail: { productId, isFavorited: isNowLiked },

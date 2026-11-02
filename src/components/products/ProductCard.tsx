@@ -147,6 +147,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Favorite Button */}
         <button
           onClick={handleFavoriteClick}
+          disabled={isTogglingFav}
           aria-label={favorited ? "Remove from saved" : "Save item"}
           className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md transition-all duration-150 z-20 cursor-pointer ${
             favorited

@@ -28,6 +28,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
             if (Array.isArray(parsed)) return new Set(parsed);
           }
         }
+        const fallback = localStorage.getItem("must_favorites");
+        if (fallback) {
+          const parsed = JSON.parse(fallback);
+          if (Array.isArray(parsed)) return new Set(parsed);
+        }
       } catch {}
     }
     return new Set();
@@ -37,10 +42,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Real-time Firebase listener on favorites for active account across all devices
   useEffect(() => {
-    if (!user?.id) {
-      setRawFavoriteIds(new Set());
-      return;
-    }
+    if (!user?.id) return;
 
     // Read local cache immediately for instant heart render without remote delay
     if (typeof window !== "undefined") {
@@ -49,7 +51,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setRawFavoriteIds(new Set(parsed));
+            setRawFavoriteIds((prev) => new Set([...prev, ...parsed]));
           }
         }
       } catch {}
@@ -66,17 +68,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           const val = snapshot.val();
           if (val && typeof val === "object") {
             const ids = Object.keys(val).filter((k) => Boolean(val[k]));
-            setRawFavoriteIds(new Set(ids));
+            setRawFavoriteIds((prev) => {
+              const merged = new Set(prev);
+              ids.forEach((id) => merged.add(id));
+              return merged;
+            });
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem(`must_fav_${user.id}`, JSON.stringify(ids));
               } catch {}
             }
-          } else {
-            setRawFavoriteIds(new Set());
           }
-        } else {
-          setRawFavoriteIds(new Set());
         }
         setLoading(false);
       },
@@ -170,28 +172,20 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     // Write to local cache immediately
     if (typeof window !== "undefined") {
       try {
-        const updatedIds = Array.from(
-          nextIsFav
-            ? new Set([...rawFavoriteIds, productId])
-            : new Set([...rawFavoriteIds].filter((id) => id !== productId))
-        );
-        localStorage.setItem(`must_fav_${user.id}`, JSON.stringify(updatedIds));
+        const currentCached = JSON.parse(localStorage.getItem(`must_fav_${user.id}`) || "[]");
+        const setIds = new Set(Array.isArray(currentCached) ? currentCached : []);
+        if (nextIsFav) setIds.add(productId);
+        else setIds.delete(productId);
+        localStorage.setItem(`must_fav_${user.id}`, JSON.stringify([...setIds]));
+        localStorage.setItem("must_favorites", JSON.stringify([...setIds]));
       } catch {}
     }
 
     try {
-      const result = await toggleFavorite(productId, user.id, nextIsFav);
-      // Synchronize exact state with authoritative result
-      setRawFavoriteIds((prev) => {
-        const next = new Set(prev);
-        if (result) next.add(productId);
-        else next.delete(productId);
-        return next;
-      });
-      return result;
+      await toggleFavorite(productId, user.id, nextIsFav);
+      return nextIsFav;
     } catch (e) {
       console.error("Favorite toggle failed:", e);
-      // In case of error, still keep the optimistic state unless explicitly reverting
       return nextIsFav;
     } finally {
       inFlightRef.current.delete(productId);
