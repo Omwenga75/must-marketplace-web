@@ -8,42 +8,58 @@ import { formatPrice } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
 import { getProductLikes } from "@/lib/firebase/services";
 import { CATEGORY_FALLBACK_IMAGES } from "@/lib/constants";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface ProductCardProps {
   product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { user } = useAuth();
+  const router = useRouter();
   const { isFavorite, toggle } = useFavorites();
   const favorited = isFavorite(product.id);
   const [isTogglingFav, setIsTogglingFav] = useState(false);
-  const [likesCount, setLikesCount] = useState<number>(() =>
-    getProductLikes(product.id, product.likes || 0)
-  );
+  // Authoritative live likes count from Firebase product data
+  const [likesCount, setLikesCount] = useState<number>(() => Number(product.likes) || 0);
 
-  // Sync likes
+  // Keep synced with props
   useEffect(() => {
-    setLikesCount(getProductLikes(product.id, product.likes || 0));
+    if (typeof product.likes === "number") {
+      setLikesCount(product.likes);
+    }
+  }, [product.likes]);
+
+  // Live real-time WebSocket listener from Firebase RTDB (single source of truth)
+  useEffect(() => {
+    if (!database || !product.id) return;
+    try {
+      const likesRef = ref(database, `products/${product.id}/likes`);
+      const unsub = onValue(likesRef, (snap) => {
+        const val = snap.val();
+        if (typeof val === "number") {
+          setLikesCount(val);
+        }
+      });
+      return () => unsub();
+    } catch {}
+  }, [product.id]);
+
+  // Listen to same-tab custom events
+  useEffect(() => {
     const handleLikesChanged = (e: any) => {
       if (e?.detail?.productId === product.id && typeof e.detail.likes === "number") {
         setLikesCount(e.detail.likes);
       }
     };
     window.addEventListener("must_product_likes_changed", handleLikesChanged);
-    let bc: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== "undefined") {
-      bc = new BroadcastChannel("must_marketplace_likes_sync");
-      bc.onmessage = (event) => {
-        if (event?.data?.productId === product.id && typeof event.data.likes === "number") {
-          setLikesCount(event.data.likes);
-        }
-      };
-    }
     return () => {
       window.removeEventListener("must_product_likes_changed", handleLikesChanged);
-      if (bc) bc.close();
     };
-  }, [product.id, product.likes]);
+  }, [product.id]);
 
   // Fallback and images
   const fallbackImg =
@@ -76,6 +92,12 @@ export default function ProductCard({ product }: ProductCardProps) {
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // 1 Account = 1 Like: Unauthenticated users are redirected to sign in!
+    if (!user) {
+      const redirectUrl = typeof window !== "undefined" ? window.location.pathname + window.location.search : "/marketplace";
+      router.push("/login?redirect=" + encodeURIComponent(redirectUrl));
+      return;
+    }
     if (isTogglingFav) return;
     setIsTogglingFav(true);
     const nextIsFav = !favorited;

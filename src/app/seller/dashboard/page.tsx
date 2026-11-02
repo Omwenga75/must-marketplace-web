@@ -23,6 +23,8 @@ import {
 import { Product } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { fetchProducts, updateProduct, deleteProduct } from "@/lib/firebase/services";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
 
@@ -48,9 +50,9 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    // 1. Initial fetch from API / cache
     fetchProducts()
       .then((all) => {
-        // Find products belonging to this seller or demo seller
         const myListings = all.filter(
           (p) => p.sellerId === user.id || p.sellerName === user.fullName || user.id === "demo_seller_456"
         );
@@ -58,6 +60,32 @@ export default function SellerDashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+
+    // 2. Live real-time listener so likes and views update INSTANTLY across all devices!
+    let unsubDb: (() => void) | null = null;
+    if (database) {
+      try {
+        const prodsRef = ref(database, "products");
+        unsubDb = onValue(prodsRef, (snapshot) => {
+          const val = snapshot.val();
+          if (val && typeof val === "object") {
+            const list: Product[] = Object.entries(val).map(([k, v]: [string, any]) => ({
+              ...v,
+              id: v.id || k,
+              likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
+              views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
+            }));
+            const myListings = list.filter(
+              (p) => p.sellerId === user.id || p.sellerName === user.fullName || user.id === "demo_seller_456"
+            );
+            setProducts(myListings);
+            setLoading(false);
+          }
+        });
+      } catch (e) {
+        console.warn("Seller dashboard RTDB listener error:", e);
+      }
+    }
 
     const handleProductDeletedEvent = (pid: string) => {
       if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
@@ -92,6 +120,7 @@ export default function SellerDashboardPage() {
     window.addEventListener("storage", onStorage);
 
     return () => {
+      if (unsubDb) unsubDb();
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
@@ -328,7 +357,7 @@ export default function SellerDashboardPage() {
           <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
             {totalViews}
           </p>
-          <p className="text-[11px] text-slate-400">Total student views</p>
+          <p className="text-[11px] text-slate-400">Total Views</p>
         </div>
 
         {/* Total Favorites */}
@@ -340,7 +369,7 @@ export default function SellerDashboardPage() {
           <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
             {totalLikes}
           </p>
-          <p className="text-[11px] text-slate-400">Saved by comrades</p>
+          <p className="text-[11px] text-slate-400">Liked Items</p>
         </div>
       </div>
 
@@ -454,7 +483,7 @@ export default function SellerDashboardPage() {
                       <span>•</span>
                       <span>{prod.views || 0} views</span>
                       <span>•</span>
-                      <span>{prod.likes || 0} saves</span>
+                      <span>{prod.likes || 0} likes</span>
                     </p>
                   </div>
                 </div>

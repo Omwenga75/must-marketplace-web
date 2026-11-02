@@ -26,6 +26,8 @@ import {
 import { Product } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS, CATEGORY_FALLBACK_IMAGES } from "@/lib/constants";
 import { fetchProducts } from "@/lib/firebase/services";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 import ProductCard from "@/components/products/ProductCard";
 import ProductGrid from "@/components/products/ProductGrid";
 import { useAuth } from "@/context/AuthContext";
@@ -56,6 +58,29 @@ export default function HomePage() {
       .catch(() => {
         setLoading(false);
       });
+
+    // Real-time Firebase listener so homepage updates LIVE when items are liked or viewed
+    let unsubDb: (() => void) | null = null;
+    if (database) {
+      try {
+        const prodsRef = ref(database, "products");
+        unsubDb = onValue(prodsRef, (snapshot) => {
+          const val = snapshot.val();
+          if (val && typeof val === "object") {
+            const list: Product[] = Object.entries(val).map(([k, v]: [string, any]) => ({
+              ...v,
+              id: v.id || k,
+              likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
+              views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
+            }));
+            setProducts(list);
+            setLoading(false);
+          }
+        });
+      } catch (e) {
+        console.warn("Homepage RTDB listener error:", e);
+      }
+    }
 
     const handleProductDeletedEvent = (pid: string) => {
       if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
@@ -98,6 +123,7 @@ export default function HomePage() {
     window.addEventListener("storage", onStorage);
 
     return () => {
+      if (unsubDb) unsubDb();
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("must_product_created", onProductCreated);
       window.removeEventListener("storage", onStorage);
@@ -213,18 +239,16 @@ export default function HomePage() {
 
                 {/* Preview Mini Carousel / Product Sample */}
                 <div className="mt-4 space-y-3">
-                  {(() => {
-                  // "Live Campus Deals" = top 3 by engagement (views + likes), must have at least 1 view OR 1 like
-                  const engaged = [...products]
-                    .filter(p => (p.status || 'ACTIVE').toUpperCase() === 'ACTIVE' && ((p.views || 0) + (p.likes || 0)) > 0)
-                    .sort((a, b) => ((b.views || 0) + (b.likes || 0)) - ((a.views || 0) + (a.likes || 0)))
-                    .slice(0, 3);
-                  // If fewer than 3 engaged items, fill with newest active items (so widget is never empty)
-                  const fallback = products
-                    .filter(p => (p.status || 'ACTIVE').toUpperCase() === 'ACTIVE' && !engaged.find(e => e.id === p.id))
-                    .slice(0, 3 - engaged.length);
-                  const dealsToShow = [...engaged, ...fallback].slice(0, 3);
-                  return dealsToShow;
+                  {((): Product[] => {
+                  // "Live Campus Deals": Strictly promoted by engagement (likes + views)!
+                  // Highest engaged active listings always appear first.
+                  const active = products.filter(p => (p.status || "ACTIVE").toUpperCase() === "ACTIVE");
+                  const sortedByEngagement = [...active].sort((a, b) => {
+                    const scoreA = (Number(a.likes) || 0) * 2 + (Number(a.views) || 0);
+                    const scoreB = (Number(b.likes) || 0) * 2 + (Number(b.views) || 0);
+                    return scoreB - scoreA;
+                  });
+                  return sortedByEngagement.slice(0, 3);
                 })().map((item) => {
                     const fallbackImg =
                       CATEGORY_FALLBACK_IMAGES[item.category?.id || "1"] ||

@@ -183,29 +183,7 @@ export function updateProductLikes(productId: string, delta: number): number {
     if (raw) likesMap = JSON.parse(raw);
   } catch {}
 
-  let currentLikes = 0;
-  if (typeof likesMap[productId] === "number") {
-    currentLikes = likesMap[productId];
-  } else {
-    // Find initial from cached products
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
-      if (cached) {
-        const list = JSON.parse(cached);
-        if (Array.isArray(list)) {
-          const item = list.find((p: any) => p.id === productId);
-          if (item && typeof item.likes === "number") {
-            currentLikes = item.likes;
-          }
-        }
-      }
-    } catch {}
-    if (currentLikes === 0) {
-      const init = INITIAL_SAMPLE_PRODUCTS.find((p) => p.id === productId);
-      if (init && typeof init.likes === "number") currentLikes = init.likes;
-    }
-  }
-
+  const currentLikes = typeof likesMap[productId] === "number" ? likesMap[productId] : 0;
   const newLikes = Math.max(0, currentLikes + delta);
   likesMap[productId] = newLikes;
 
@@ -213,49 +191,14 @@ export function updateProductLikes(productId: string, delta: number): number {
     localStorage.setItem(PRODUCT_LIKES_KEY, JSON.stringify(likesMap));
   } catch {}
 
-  // Update cached products array
-  try {
-    const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
-    let list: Product[] = cached ? JSON.parse(cached) : [...INITIAL_SAMPLE_PRODUCTS];
-    if (Array.isArray(list)) {
-      const idx = list.findIndex((p) => p.id === productId);
-      if (idx !== -1) {
-        list[idx] = { ...list[idx], likes: newLikes };
-      } else {
-        const sample = INITIAL_SAMPLE_PRODUCTS.find((p) => p.id === productId);
-        if (sample) list.push({ ...sample, likes: newLikes });
-      }
-      localStorage.setItem(LOCAL_STORAGE_PRODUCTS_KEY, JSON.stringify(list));
-    }
-  } catch {}
-
-  // Dispatch events for live updates across all UI components and tabs
+  // Dispatch events for same-window tabs
   try {
     window.dispatchEvent(
       new CustomEvent("must_product_likes_changed", {
         detail: { productId, likes: newLikes },
       })
     );
-    if (typeof BroadcastChannel !== "undefined") {
-      const bc = new BroadcastChannel("must_marketplace_likes_sync");
-      bc.postMessage({ productId, likes: newLikes });
-      bc.close();
-    }
   } catch {}
-
-  // Attempt non-blocking background Firebase sync (500ms race)
-  if (database) {
-    const updatePromise = (async () => {
-      try {
-        const prodLikesRef = ref(database, `products/${productId}/likes`);
-        await set(prodLikesRef, newLikes);
-      } catch {}
-    })();
-    Promise.race([
-      updatePromise,
-      new Promise((res) => setTimeout(res, 500)),
-    ]).catch(() => {});
-  }
 
   return newLikes;
 }
@@ -272,7 +215,7 @@ function getLocalStoredProducts(): Product[] {
           .filter((item) => !deleted.has(item.id))
           .map((item) => ({
             ...item,
-            likes: getProductLikes(item.id, item.likes),
+            likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
           }));
       }
     }
@@ -283,7 +226,7 @@ function getLocalStoredProducts(): Product[] {
     .filter((p) => !deleted.has(p.id))
     .map((item) => ({
       ...item,
-      likes: getProductLikes(item.id, item.likes),
+      likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
     }));
 }
 
@@ -329,7 +272,7 @@ export async function fetchProducts(): Promise<Product[]> {
       category: item.category || SAMPLE_CATEGORIES[0],
       price: Number(item.price) || 0,
       views: Number(item.views) || 0,
-      likes: getProductLikes(id, Number(item.likes) || 0),
+      likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
       status: item.status || "ACTIVE",
       condition: item.condition || "NEW",
       createdAt: item.createdAt || new Date().toISOString(),
@@ -429,7 +372,7 @@ export async function getProductById(id: string): Promise<Product | null> {
         const item: Product = await res.json();
         return {
           ...item,
-          likes: getProductLikes(id, Number(item.likes) || 0),
+          likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
         };
       }
     } catch {}
@@ -458,7 +401,7 @@ export async function getProductById(id: string): Promise<Product | null> {
           category: item.category || SAMPLE_CATEGORIES[0],
           price: Number(item.price) || 0,
           views: Number(item.views) || 0,
-          likes: getProductLikes(id, Number(item.likes) || 0),
+          likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
         };
       }
     } catch (err) {
@@ -472,20 +415,34 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function recordProductView(productId: string, userId?: string) {
-  if (!database || !userId || !productId) return;
+  if (!database || !productId) return;
   try {
-    // Guard: 1 view per user per product (stored in product_views/{productId}/{userId})
-    const viewRef = ref(database, `product_views/${productId}/${userId}`);
-    const snapshot = await get(viewRef);
-    if (snapshot.exists()) return; // already recorded for this user
+    let viewerKey = userId;
+    if (!viewerKey && typeof window !== "undefined") {
+      let vid = localStorage.getItem("must_device_visitor_id");
+      if (!vid) {
+        vid = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem("must_device_visitor_id", vid);
+      }
+      viewerKey = vid;
+    }
+    if (!viewerKey) return;
 
-    // Mark as viewed by this user first (idempotent guard)
-    await set(viewRef, true);
+    // Check if this viewer already viewed this product (1 account / 1 visitor = 1 view)
+    const viewRecordRef = ref(database, `product_views/${productId}/${viewerKey}`);
+    const snap = await get(viewRecordRef);
+    if (snap.exists() && snap.val() === true) {
+      return; // Already recorded! Strict deduplication.
+    }
 
-    // Atomically increment views using a transaction to prevent race conditions
-    const viewsCountRef = ref(database, `products/${productId}/views`);
-    await runTransaction(viewsCountRef, (current) => {
-      return (typeof current === "number" ? current : 0) + 1;
+    // Mark as viewed
+    await set(viewRecordRef, true);
+
+    // Atomically increment views count in Firebase
+    const viewsRef = ref(database, `products/${productId}/views`);
+    await runTransaction(viewsRef, (current) => {
+      const val = typeof current === "number" ? current : 0;
+      return val + 1;
     });
   } catch (err) {
     console.warn("Failed to record product view in Firebase:", err);
@@ -494,104 +451,62 @@ export async function recordProductView(productId: string, userId?: string) {
 
 export async function toggleFavorite(productId: string, userId?: string): Promise<boolean> {
   if (!productId) return false;
-
-  let isNowFavorited = false;
-
-  // 1. Check current saved state from unified storage
-  let savedSet = new Set<string>();
-  if (typeof window !== "undefined") {
-    try {
-      const unified = JSON.parse(localStorage.getItem(UNIFIED_FAVORITES_KEY) || "[]");
-      if (Array.isArray(unified)) unified.forEach((id: string) => savedSet.add(id));
-      const guest = JSON.parse(localStorage.getItem(GUEST_FAVORITES_KEY) || "[]");
-      if (Array.isArray(guest)) guest.forEach((id: string) => savedSet.add(id));
-      if (userId) {
-        const userFavs = JSON.parse(localStorage.getItem(`must_fav_${userId}`) || "{}");
-        Object.keys(userFavs).forEach((id) => savedSet.add(id));
-      }
-    } catch {}
+  if (!userId) {
+    // 1 Account = 1 Like: Must be signed in to like items!
+    return false;
   }
 
-  if (savedSet.has(productId)) {
-    savedSet.delete(productId);
-    isNowFavorited = false;
-  } else {
-    savedSet.add(productId);
-    isNowFavorited = true;
-  }
+  if (!database) return false;
 
-  // 2. Immediately update product likes count (+1 or -1)
-  updateProductLikes(productId, isNowFavorited ? 1 : -1);
+  try {
+    const favRef = ref(database, `favorites/${userId}/${productId}`);
+    const snap = await get(favRef);
+    const currentlyFavorited = snap.exists() && snap.val() === true;
+    const isNowFavorited = !currentlyFavorited;
 
-  // 3. Persist to unified, guest, and user storage
-  if (typeof window !== "undefined") {
-    try {
-      const arr = Array.from(savedSet);
-      localStorage.setItem(UNIFIED_FAVORITES_KEY, JSON.stringify(arr));
-      localStorage.setItem(GUEST_FAVORITES_KEY, JSON.stringify(arr));
-
-      if (userId) {
-        const userObj: Record<string, boolean> = {};
-        arr.forEach((id) => {
-          userObj[id] = true;
-        });
-        localStorage.setItem(`must_fav_${userId}`, JSON.stringify(userObj));
-      }
-    } catch (e) {
-      console.error("Local favorite save error:", e);
+    if (isNowFavorited) {
+      await set(favRef, true);
+    } else {
+      await remove(favRef);
     }
 
-    // Broadcast favorites change
-    try {
+    // Atomically update product likes count in Firebase RTDB
+    const likesRef = ref(database, `products/${productId}/likes`);
+    const txResult = await runTransaction(likesRef, (current) => {
+      const val = typeof current === "number" ? current : 0;
+      return isNowFavorited ? val + 1 : Math.max(0, val - 1);
+    });
+
+    const newLikesCount = typeof txResult.snapshot.val() === "number" ? txResult.snapshot.val() : 0;
+
+    // Update local favorite set
+    if (typeof window !== "undefined") {
+      try {
+        const unified = JSON.parse(localStorage.getItem(UNIFIED_FAVORITES_KEY) || "[]");
+        const setIds = new Set(Array.isArray(unified) ? unified : []);
+        if (isNowFavorited) setIds.add(productId);
+        else setIds.delete(productId);
+        localStorage.setItem(UNIFIED_FAVORITES_KEY, JSON.stringify([...setIds]));
+      } catch {}
+
+      // Dispatch real-time events across components
       window.dispatchEvent(
-        new CustomEvent("must_favorites_updated", {
-          detail: { productId, isFavorited: isNowFavorited, allIds: Array.from(savedSet) },
+        new CustomEvent("must_product_likes_changed", {
+          detail: { productId, likes: newLikesCount },
         })
       );
-      if (typeof BroadcastChannel !== "undefined") {
-        const bc = new BroadcastChannel("must_marketplace_favorites_sync");
-        bc.postMessage({ productId, isFavorited: isNowFavorited, allIds: Array.from(savedSet) });
-        bc.close();
-      }
-    } catch {}
+      window.dispatchEvent(
+        new CustomEvent("must_favorites_updated", {
+          detail: { productId, isFavorited: isNowFavorited },
+        })
+      );
+    }
+
+    return isNowFavorited;
+  } catch (err) {
+    console.error("toggleFavorite transaction error:", err);
+    return false;
   }
-
-  // 4. Background Firebase sync: atomic like count transaction + per-user guard
-  if (database && userId) {
-    const fbPromise = (async () => {
-      try {
-        // Per-user like guard stored at favorites/{userId}/{productId}
-        const favRef = ref(database, `favorites/${userId}/${productId}`);
-        const snap = await get(favRef);
-        const alreadyLiked = snap.exists() && snap.val() === true;
-
-        if (isNowFavorited && !alreadyLiked) {
-          // Mark as liked by this user
-          await set(favRef, true);
-          // Atomically increment likes count
-          const likesRef = ref(database, `products/${productId}/likes`);
-          await runTransaction(likesRef, (current) => {
-            return (typeof current === "number" ? current : 0) + 1;
-          });
-        } else if (!isNowFavorited && alreadyLiked) {
-          // Remove like
-          await remove(favRef);
-          // Atomically decrement likes count (floor at 0)
-          const likesRef = ref(database, `products/${productId}/likes`);
-          await runTransaction(likesRef, (current) => {
-            const n = typeof current === "number" ? current : 0;
-            return Math.max(0, n - 1);
-          });
-        }
-      } catch {}
-    })();
-    Promise.race([
-      fbPromise,
-      new Promise((res) => setTimeout(res, 500)),
-    ]).catch(() => {});
-  }
-
-  return isNowFavorited;
 }
 
 export async function getUserFavorites(userId?: string): Promise<string[]> {

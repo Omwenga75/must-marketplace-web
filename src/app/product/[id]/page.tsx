@@ -22,6 +22,8 @@ import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { CATEGORY_FALLBACK_IMAGES } from "@/lib/constants";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -40,9 +42,25 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (product) {
-      setLikesCount(getProductLikes(product.id, product.likes || 0));
+      setLikesCount(Number(product.likes) || 0);
     }
   }, [product]);
+
+  // Real-time listener for live likes & views updates
+  useEffect(() => {
+    if (!database || !productId) return;
+    try {
+      const prodRef = ref(database, `products/${productId}`);
+      const unsub = onValue(prodRef, (snap) => {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          if (typeof val.likes === "number") setLikesCount(val.likes);
+          setProduct((prev) => prev ? { ...prev, likes: val.likes, views: val.views } : prev);
+        }
+      });
+      return () => unsub();
+    } catch {}
+  }, [productId]);
 
   useEffect(() => {
     if (!productId) return;
@@ -59,6 +77,10 @@ export default function ProductDetailPage() {
 
   const handleToggleFavorite = async () => {
     if (!product) return;
+    if (!user) {
+      router.push(`/login?redirect=/product/${product.id}`);
+      return;
+    }
     const nextIsFav = !favorited;
     setLikesCount((prev) => (nextIsFav ? prev + 1 : Math.max(0, prev - 1)));
     await toggle(product.id);
