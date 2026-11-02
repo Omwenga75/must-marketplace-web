@@ -483,21 +483,24 @@ export async function toggleFavorite(productId: string, userId?: string): Promis
       ]);
     }
 
-    // Atomically increment or decrement products/${productId}/likes in Firebase RTDB
-    const likesRef = ref(database, `products/${productId}/likes`);
-    const txResult = await runTransaction(likesRef, (current) => {
-      const val = typeof current === "number" ? current : 0;
-      return isNowLiked ? val + 1 : Math.max(0, val - 1);
-    });
+    // Authoritative unique account count: exactly 1 account = 1 like (no leakage/drift/infinite increments)
+    const allLikesSnap = await get(ref(database, `product_likes/${productId}`));
+    let trueLikesCount = 0;
+    if (allLikesSnap.exists()) {
+      const val = allLikesSnap.val();
+      if (val && typeof val === "object") {
+        trueLikesCount = Object.keys(val).filter((k) => val[k] === true).length;
+      }
+    }
 
-    const newLikesCount =
-      typeof txResult.snapshot.val() === "number" ? txResult.snapshot.val() : 0;
+    // Set the EXACT true count on products/${productId}/likes
+    await set(ref(database, `products/${productId}/likes`), trueLikesCount);
 
     // Dispatch real-time events across components in the current window
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("must_product_likes_changed", {
-          detail: { productId, likes: newLikesCount },
+          detail: { productId, likes: trueLikesCount },
         })
       );
       window.dispatchEvent(

@@ -1,8 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { useAuth } from "./AuthContext";
 import { getUserFavorites, toggleFavorite } from "@/lib/firebase/services";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 
 interface FavoritesContextType {
   favoriteIds: Set<string>;
@@ -15,32 +17,76 @@ const FavoritesContext = createContext<FavoritesContextType | undefined>(undefin
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [rawFavoriteIds, setRawFavoriteIds] = useState<Set<string>>(new Set());
+  const [soldProductIds, setSoldProductIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
-  // Strictly sync favorites for the CURRENT active user account (no cross-account leakage)
-  const refreshFavorites = useCallback(async () => {
-    if (!user?.id) {
-      // If user is logged out, clear favorites completely!
-      setFavoriteIds(new Set());
+  // 1. Real-time Firebase listener on favorites for active account across all devices
+  useEffect(() => {
+    if (!database || !user?.id) {
+      setRawFavoriteIds(new Set());
       return;
     }
 
-    try {
-      setLoading(true);
-      // Fetch only this user's true favorites from Firebase
-      const ids = await getUserFavorites(user.id);
-      setFavoriteIds(new Set(ids));
-    } catch (e) {
-      console.warn("refreshFavorites error:", e);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const favRef = ref(database, `favorites/${user.id}`);
+    const unsubscribe = onValue(
+      favRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const val = snapshot.val();
+          if (val && typeof val === "object") {
+            const ids = Object.keys(val).filter((k) => Boolean(val[k]));
+            setRawFavoriteIds(new Set(ids));
+          } else {
+            setRawFavoriteIds(new Set());
+          }
+        } else {
+          setRawFavoriteIds(new Set());
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.warn("Favorites RTDB listener error:", err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [user?.id]);
 
+  // 2. Real-time Firebase listener on products to track SOLD items
   useEffect(() => {
-    refreshFavorites();
-  }, [refreshFavorites]);
+    if (!database) return;
+    try {
+      const prodsRef = ref(database, "products");
+      const unsubscribe = onValue(prodsRef, (snapshot) => {
+        const val = snapshot.val();
+        if (val && typeof val === "object") {
+          const soldIds = new Set<string>();
+          Object.entries(val).forEach(([id, item]: [string, any]) => {
+            const status = (item?.status || "ACTIVE").toUpperCase();
+            if (status === "SOLD") {
+              soldIds.add(item?.id || id);
+            }
+          });
+          setSoldProductIds(soldIds);
+        }
+      });
+      return () => unsubscribe();
+    } catch {}
+  }, []);
+
+  // Filter out SOLD products: counts and saves automatically drop when an item is sold
+  const favoriteIds = useMemo(() => {
+    const active = new Set<string>();
+    rawFavoriteIds.forEach((id) => {
+      if (!soldProductIds.has(id)) {
+        active.add(id);
+      }
+    });
+    return active;
+  }, [rawFavoriteIds, soldProductIds]);
 
   // Synchronize across open tabs for the SAME active user
   useEffect(() => {
@@ -49,7 +95,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const handleCustomEvent = (e: any) => {
       const { productId, isFavorited } = e?.detail || {};
       if (productId) {
-        setFavoriteIds((prev) => {
+        setRawFavoriteIds((prev) => {
           const next = new Set(prev);
           if (isFavorited) next.add(productId);
           else next.delete(productId);
@@ -71,7 +117,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     const nextIsFav = !isCurrentlyFav;
 
     // Optimistic UI update
-    setFavoriteIds((prev) => {
+    setRawFavoriteIds((prev) => {
       const next = new Set(prev);
       if (nextIsFav) next.add(productId);
       else next.delete(productId);
@@ -82,7 +128,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       const result = await toggleFavorite(productId, user.id);
       if (result !== nextIsFav) {
         // Revert if remote result differed
-        setFavoriteIds((prev) => {
+        setRawFavoriteIds((prev) => {
           const next = new Set(prev);
           if (result) next.add(productId);
           else next.delete(productId);
@@ -93,7 +139,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("Favorite toggle failed:", e);
       // Revert optimistic update
-      setFavoriteIds((prev) => {
+      setRawFavoriteIds((prev) => {
         const next = new Set(prev);
         if (isCurrentlyFav) next.add(productId);
         else next.delete(productId);

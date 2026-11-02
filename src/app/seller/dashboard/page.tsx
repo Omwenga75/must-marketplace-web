@@ -208,10 +208,11 @@ export default function SellerDashboardPage() {
     );
   }
 
-  const activeCount = products.filter((p) => p.status === "ACTIVE").length;
-  const soldCount = products.filter((p) => p.status === "SOLD").length;
-  const totalViews = products.reduce((acc, p) => acc + (p.views || 0), 0);
-  const totalLikes = products.reduce((acc, p) => acc + (p.likes || 0), 0);
+  const activeProducts = products.filter((p) => (p.status || "ACTIVE").toUpperCase() === "ACTIVE");
+  const activeCount = activeProducts.length;
+  const soldCount = products.filter((p) => (p.status || "").toUpperCase() === "SOLD").length;
+  const totalViews = activeProducts.reduce((acc, p) => acc + (p.views || 0), 0);
+  const totalLikes = activeProducts.reduce((acc, p) => acc + (p.likes || 0), 0);
 
   const displayedListings = products.filter((p) => {
     if (filterTab === "ALL") return true;
