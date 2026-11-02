@@ -331,13 +331,13 @@ export default function SellerDashboardPage() {
           </div>
         </div>
 
-        {/* Listings Grid */}
+        {/* Listings Grid - Exactly Two In A Row */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className="h-44 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse border border-slate-200/60 dark:border-slate-800"
+                className="h-28 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse border border-slate-200/60 dark:border-slate-800"
               />
             ))}
           </div>
@@ -359,20 +359,20 @@ export default function SellerDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayedListings.map((prod) => (
               <div
                 key={prod.id}
-                className="flex flex-col justify-between p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-4"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
               >
-                <div className="flex items-start gap-3.5 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <img
                     src={prod.imageUrls?.[0] || "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800"}
                     alt={prod.title}
                     className="w-16 h-16 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/60 dark:border-slate-800"
                   />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center justify-between gap-1.5">
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2">
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={prod.title}>
                         {prod.title}
                       </h4>
@@ -389,7 +389,7 @@ export default function SellerDashboardPage() {
                     <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                       {formatPrice(prod.price)}
                     </p>
-                    <p className="text-[11px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                    <p className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
                       <span>{prod.location}</span>
                       <span>•</span>
                       <span>{prod.views || 0} views</span>
@@ -400,52 +400,48 @@ export default function SellerDashboardPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 gap-2 text-xs font-semibold">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 text-xs font-semibold">
+                  <Link
+                    href={`/product/${prod.id}`}
+                    target="_blank"
+                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                    title="View live page"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Link>
+
+                  <button
+                    onClick={() => handleOpenEdit(prod)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-colors cursor-pointer"
+                    title="Edit item details"
+                  >
+                    <Edit className="w-3.5 h-3.5 text-secondary" />
+                    <span>Edit</span>
+                  </button>
+
+                  {prod.status === "ACTIVE" ? (
                     <button
-                      onClick={() => handleOpenEdit(prod)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-colors"
-                      title="Edit item details"
+                      onClick={() => handleMarkAsSold(prod.id)}
+                      className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-bold"
                     >
-                      <Edit className="w-3.5 h-3.5 text-secondary" />
-                      <span>Edit</span>
+                      Mark as Sold
                     </button>
-
-                    <Link
-                      href={`/product/${prod.id}`}
-                      target="_blank"
-                      className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-                      title="View live page"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {prod.status === "ACTIVE" ? (
-                      <button
-                        onClick={() => handleMarkAsSold(prod.id)}
-                        className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors text-xs font-bold"
-                      >
-                        Mark as Sold
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleMarkAsActive(prod.id)}
-                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors text-xs font-bold"
-                      >
-                        Mark as Active
-                      </button>
-                    )}
-
+                  ) : (
                     <button
-                      onClick={() => handleDeleteListing(prod.id)}
-                      className="p-1.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 transition-colors"
-                      title="Delete ad"
+                      onClick={() => handleMarkAsActive(prod.id)}
+                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors cursor-pointer text-xs font-bold"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      Mark as Active
                     </button>
-                  </div>
+                  )}
+
+                  <button
+                    onClick={() => handleDeleteListing(prod.id)}
+                    className="p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 transition-colors cursor-pointer"
+                    title="Delete ad"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}
