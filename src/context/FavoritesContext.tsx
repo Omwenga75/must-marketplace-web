@@ -28,11 +28,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
             if (Array.isArray(parsed)) return new Set(parsed);
           }
         }
-        const fallback = localStorage.getItem("must_favorites");
-        if (fallback) {
-          const parsed = JSON.parse(fallback);
-          if (Array.isArray(parsed)) return new Set(parsed);
-        }
       } catch {}
     }
     return new Set();
@@ -43,22 +38,29 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   // 1. Real-time Firebase listener on favorites for active account across all devices
   useEffect(() => {
     if (!user?.id) {
-      // User logged out — clear all liked state so the next user starts clean
+      // User logged out or unauthenticated — clear all liked state so no data leaks
       setRawFavoriteIds(new Set());
       return;
     }
 
-    // Read local cache immediately for instant heart render without remote delay
+    // Read local cache for this specific user immediately for instant heart render
     if (typeof window !== "undefined") {
       try {
         const cached = localStorage.getItem(`must_fav_${user.id}`);
         if (cached) {
           const parsed = JSON.parse(cached);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setRawFavoriteIds((prev) => new Set([...prev, ...parsed]));
+          if (Array.isArray(parsed)) {
+            // REPLACE — do not merge with whatever was in state previously!
+            setRawFavoriteIds(new Set(parsed));
+          } else {
+            setRawFavoriteIds(new Set());
           }
+        } else {
+          setRawFavoriteIds(new Set());
         }
-      } catch {}
+      } catch {
+        setRawFavoriteIds(new Set());
+      }
     }
 
     if (!database) return;
@@ -72,20 +74,26 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           const val = snapshot.val();
           if (val && typeof val === "object") {
             const ids = Object.keys(val).filter((k) => Boolean(val[k]));
-            // REPLACE with server state — do NOT merge, otherwise an unlikes item
-            // gets re-added when the Firebase onValue fires after the local delete.
+            // Authoritative server state: replace completely
             setRawFavoriteIds(new Set(ids));
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem(`must_fav_${user.id}`, JSON.stringify(ids));
-                localStorage.setItem("must_favorites", JSON.stringify(ids));
               } catch {}
             }
           }
-          // snapshot.exists() but empty val → no-op (keep current local state)
+        } else {
+          // Node does not exist on Firebase (0 favorites or user unliked everything).
+          // Only clear if there is no in-flight toggle right now on this device.
+          if (inFlightRef.current.size === 0) {
+            setRawFavoriteIds(new Set());
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem(`must_fav_${user.id}`, JSON.stringify([]));
+              } catch {}
+            }
+          }
         }
-        // snapshot does NOT exist → Firebase has no favorites for this user yet.
-        // Keep whatever is in local state; do NOT wipe it.
         setLoading(false);
       },
       (err) => {
@@ -183,7 +191,6 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         if (nextIsFav) setIds.add(productId);
         else setIds.delete(productId);
         localStorage.setItem(`must_fav_${user.id}`, JSON.stringify([...setIds]));
-        localStorage.setItem("must_favorites", JSON.stringify([...setIds]));
       } catch {}
     }
 

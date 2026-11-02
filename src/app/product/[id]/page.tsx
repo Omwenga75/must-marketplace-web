@@ -30,15 +30,17 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const productId = params.id as string;
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { isFavorite, toggle } = useFavorites();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isTogglingFav, setIsTogglingFav] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedShare, setCopiedShare] = useState(false);
   const [likesCount, setLikesCount] = useState<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasRecordedViewRef = useRef(false);
 
   useEffect(() => {
     if (product) {
@@ -76,7 +78,7 @@ export default function ProductDetailPage() {
   }, [productId]);
 
   const handleToggleFavorite = async () => {
-    if (!product) return;
+    if (!product || isTogglingFav) return;
     if (!user) {
       router.push(`/login?redirect=/product/${product.id}`);
       return;
@@ -86,9 +88,38 @@ export default function ProductDetailPage() {
     //   1. Real-time onValue on products/${productId} (cross-device, all users)
     //   2. must_product_likes_changed custom event (same-tab instant update)
     // Adding a local increment would double-count when the RTDB event fires.
-    await toggle(product.id);
+    setIsTogglingFav(true);
+    try {
+      await toggle(product.id);
+    } finally {
+      setIsTogglingFav(false);
+    }
   };
 
+  // Dedicated view recording effect: waits for auth to initialize so accounts never get guest views
+  useEffect(() => {
+    if (!productId || authLoading || hasRecordedViewRef.current) return;
+
+    hasRecordedViewRef.current = true;
+    if (user?.id) {
+      // 1 Account = 1 View (enforced in Firebase RTDB via product_views/{productId}/{userId})
+      recordProductView(productId, user.id);
+    } else {
+      // Unauthenticated Guest: 1 view per browser session
+      const sessionKey = `must_view_${productId}`;
+      if (typeof sessionStorage !== "undefined" && !sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, "1");
+        let sessionId = sessionStorage.getItem("must_guest_session_id");
+        if (!sessionId) {
+          sessionId = "g_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+          sessionStorage.setItem("must_guest_session_id", sessionId);
+        }
+        recordProductView(productId, `guest_${sessionId}`);
+      }
+    }
+  }, [productId, user?.id, authLoading]);
+
+  // Product data loading and real-time deletion listener
   useEffect(() => {
     if (!productId) return;
 
@@ -97,26 +128,6 @@ export default function ProductDetailPage() {
         setProduct(data);
         document.title = `${data.title} | Ksh ${data.price}`;
         setLoading(false);
-        if (data) {
-          if (user?.id) {
-            // Authenticated: 1 view per account (enforced in Firebase via product_views/{productId}/{userId})
-            recordProductView(data.id, user.id);
-          } else {
-            // Guest: 1 view per browser session using sessionStorage guard
-            const sessionKey = `must_view_${data.id}`;
-            if (typeof sessionStorage !== "undefined" && !sessionStorage.getItem(sessionKey)) {
-              sessionStorage.setItem(sessionKey, "1");
-              // Use a session-scoped pseudo-ID so Firebase deduplicates per device session
-              const sessionId = `guest_${(() => {
-                const k = "must_guest_session_id";
-                let g = sessionStorage.getItem(k);
-                if (!g) { g = "g_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); sessionStorage.setItem(k, g); }
-                return g;
-              })()}`;
-              recordProductView(data.id, sessionId);
-            }
-          }
-        }
       })
       .catch(() => {
         setLoading(false);
@@ -154,7 +165,7 @@ export default function ProductDetailPage() {
       window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
     };
-  }, [productId, user?.id]);
+  }, [productId]);
 
   const fallbackImg =
     CATEGORY_FALLBACK_IMAGES[product?.category?.id || "1"] ||
@@ -362,6 +373,7 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={handleToggleFavorite}
+                disabled={isTogglingFav}
                 className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
                   favorited
                     ? "text-rose-600 dark:text-rose-400"

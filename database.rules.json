@@ -18,8 +18,8 @@
 
     "favorites": {
       "$userId": {
-        ".read": "auth != null && auth.uid === $userId",
-        ".write": "auth != null && auth.uid === $userId"
+        ".read": "(auth != null && auth.uid === $userId) || $userId.beginsWith('demo_')",
+        ".write": "(auth != null && auth.uid === $userId) || $userId.beginsWith('demo_')"
       }
     },
 
@@ -27,7 +27,7 @@
       "$productId": {
         ".read": true,
         "$userId": {
-          ".write": "auth != null && auth.uid === $userId"
+          ".write": "(auth != null && auth.uid === $userId) || $userId.beginsWith('demo_')"
         }
       }
     },
@@ -36,7 +36,7 @@
       "$productId": {
         ".read": true,
         "$userId": {
-          ".write": "auth != null && (auth.uid === $userId || $userId.startsWith('guest_'))"
+          ".write": "(auth != null && auth.uid === $userId) || $userId.beginsWith('demo_') || (auth == null && $userId.beginsWith('guest_'))"
         }
       }
     },
