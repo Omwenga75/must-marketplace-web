@@ -42,7 +42,11 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Real-time Firebase listener on favorites for active account across all devices
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      // User logged out — clear all liked state so the next user starts clean
+      setRawFavoriteIds(new Set());
+      return;
+    }
 
     // Read local cache immediately for instant heart render without remote delay
     if (typeof window !== "undefined") {

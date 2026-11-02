@@ -81,8 +81,11 @@ export default function ProductDetailPage() {
       router.push(`/login?redirect=/product/${product.id}`);
       return;
     }
-    const nextIsFav = !favorited;
-    setLikesCount((prev) => (nextIsFav ? prev + 1 : Math.max(0, prev - 1)));
+    // Do NOT do any local optimistic counter increment here.
+    // The authoritative count comes from two places:
+    //   1. Real-time onValue on products/${productId} (cross-device, all users)
+    //   2. must_product_likes_changed custom event (same-tab instant update)
+    // Adding a local increment would double-count when the RTDB event fires.
     await toggle(product.id);
   };
 

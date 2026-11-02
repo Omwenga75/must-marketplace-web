@@ -2,30 +2,55 @@
   "rules": {
     ".read": "auth != null",
     ".write": "auth != null",
+
     "products": {
       ".read": true,
-      ".write": "auth != null"
+      "$productId": {
+        ".write": "auth != null",
+        "likes": {
+          ".write": true
+        },
+        "views": {
+          ".write": true
+        }
+      }
     },
+
     "favorites": {
-      ".read": true,
-      ".write": true
+      "$userId": {
+        ".read": "auth != null && auth.uid === $userId",
+        ".write": "auth != null && auth.uid === $userId"
+      }
     },
+
     "product_likes": {
-      ".read": true,
-      ".write": true
+      "$productId": {
+        ".read": true,
+        "$userId": {
+          ".write": "auth != null && auth.uid === $userId"
+        }
+      }
     },
+
     "product_views": {
-      ".read": true,
-      ".write": true
+      "$productId": {
+        ".read": true,
+        "$userId": {
+          ".write": "auth != null && (auth.uid === $userId || $userId.startsWith('guest_'))"
+        }
+      }
     },
+
     "deleted_products": {
       ".read": true,
       ".write": "auth != null"
     },
+
     "deleted_users": {
       ".read": true,
       ".write": "auth != null"
     },
+
     "users": {
       ".read": "auth != null",
       ".write": "auth != null",
@@ -34,24 +59,29 @@
         ".write": "auth != null && auth.uid === $uid"
       }
     },
+
     "notifications": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
+
     "admin_broadcasts": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
+
     "conversations": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
+
     "messages": {
       ".read": "auth != null",
       ".write": "auth != null"
     },
+
     "chatroom": {
       ".read": "auth != null",
       ".write": "auth != null"

@@ -419,30 +419,37 @@ export async function recordProductView(productId: string, userId?: string) {
   try {
     let viewerKey = userId;
     if (!viewerKey && typeof window !== "undefined") {
-      let vid = localStorage.getItem("must_device_visitor_id");
+      // Guest: use a stable session-scoped visitor ID
+      let vid = sessionStorage.getItem("must_guest_session_id");
       if (!vid) {
-        vid = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-        localStorage.setItem("must_device_visitor_id", vid);
+        vid = "g_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+        sessionStorage.setItem("must_guest_session_id", vid);
       }
-      viewerKey = vid;
+      viewerKey = "guest_" + vid;
     }
     if (!viewerKey) return;
 
-    // Check if this viewer already viewed this product (1 account / 1 visitor = 1 view)
+    // Atomically claim the view slot for this viewer.
+    // runTransaction only proceeds if the node is currently null/undefined.
+    // If two concurrent requests race, Firebase guarantees exactly one wins.
     const viewRecordRef = ref(database, `product_views/${productId}/${viewerKey}`);
-    const snap = await get(viewRecordRef);
-    if (snap.exists() && snap.val() === true) {
-      return; // Already recorded! Strict deduplication.
+    const result = await runTransaction(viewRecordRef, (current) => {
+      if (current !== null && current !== undefined) {
+        // Already viewed — abort, do not increment counter
+        return undefined; // returning undefined aborts the transaction
+      }
+      return true; // claim the slot
+    });
+
+    if (!result.committed) {
+      // View already existed — do nothing
+      return;
     }
 
-    // Mark as viewed
-    await set(viewRecordRef, true);
-
-    // Atomically increment views count in Firebase
+    // Only if the slot was newly claimed: atomically increment views counter
     const viewsRef = ref(database, `products/${productId}/views`);
     await runTransaction(viewsRef, (current) => {
-      const val = typeof current === "number" ? current : 0;
-      return val + 1;
+      return (typeof current === "number" ? current : 0) + 1;
     });
   } catch (err) {
     console.warn("Failed to record product view in Firebase:", err);
@@ -494,7 +501,11 @@ export async function toggleFavorite(
         ]);
       }
 
-      // Authoritative unique account count: exactly 1 account = 1 like (no leakage/drift/infinite increments)
+      // Recount from the authoritative source: product_likes/{productId}
+      // Count = number of unique userIds that have value === true.
+      // This is the ONLY place the count is derived from. Never incremented blindly.
+      // 1 account = 1 record = 1 like. Concurrent writes from multiple devices
+      // all resolve to the same set() for the same userId, so the final count is correct.
       const allLikesSnap = await get(ref(database, `product_likes/${productId}`));
       if (allLikesSnap.exists()) {
         const val = allLikesSnap.val();
@@ -503,7 +514,8 @@ export async function toggleFavorite(
         }
       }
 
-      // Set the EXACT true count on products/${productId}/likes
+      // Overwrite products/${productId}/likes with the exact true count.
+      // This corrects any prior counter drift automatically on every toggle.
       await set(ref(database, `products/${productId}/likes`), trueLikesCount);
     } catch (fbErr) {
       console.warn("Firebase like write warning:", fbErr);
