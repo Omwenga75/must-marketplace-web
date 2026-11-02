@@ -186,13 +186,14 @@ function MessagesContent() {
       setConversationsLoaded(true);
 
       // Handle query param target conversation from product page
-      if (sellerIdQuery && sellerNameQuery) {
+      if (sellerIdQuery) {
         const targetConvId = getConversationId(user.id, sellerIdQuery);
+        const targetName = (sellerNameQuery || "").trim() || "MUST Seller";
         const existing = dedupled.find(
           (c) =>
             c.id === targetConvId ||
             c.otherUserId === sellerIdQuery ||
-            c.otherUserName?.trim().toLowerCase() === sellerNameQuery.trim().toLowerCase()
+            (sellerNameQuery && c.otherUserName?.trim().toLowerCase() === sellerNameQuery.trim().toLowerCase())
         );
         if (existing) {
           openConversation(existing);
@@ -200,7 +201,7 @@ function MessagesContent() {
           const newTarget: Conversation = {
             id: targetConvId,
             otherUserId: sellerIdQuery,
-            otherUserName: sellerNameQuery,
+            otherUserName: targetName,
             lastMessage: "",
             lastMessageTime: String(Date.now()),
             unreadCount: 0,
@@ -295,12 +296,14 @@ function MessagesContent() {
     }
   };
 
-  // Filter conversations
+  // Filter conversations safely
   const filteredConversations = deduplicateConversations(
-    conversations.filter((c) =>
-      c.otherUserName.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(searchFilter.toLowerCase())
-    )
+    conversations.filter((c) => {
+      const name = (c?.otherUserName || "").toLowerCase();
+      const last = (c?.lastMessage || "").toLowerCase();
+      const q = (searchFilter || "").toLowerCase();
+      return name.includes(q) || last.includes(q);
+    })
   );
 
   return (
@@ -377,7 +380,7 @@ function MessagesContent() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                          {conv.otherUserName}
+                          {conv.otherUserName || "MUST Comrade"}
                         </p>
                         <span className="text-[10px] text-slate-400 shrink-0">
                           {formatRelativeTime(conv.lastMessageTime)}
@@ -433,12 +436,12 @@ function MessagesContent() {
                 </button>
 
                 <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-sm shrink-0">
-                  {activeConversation.otherUserName.charAt(0).toUpperCase()}
+                  {(activeConversation.otherUserName || "U").charAt(0).toUpperCase()}
                 </div>
 
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                    {activeConversation.otherUserName}
+                    {activeConversation.otherUserName || "MUST Comrade"}
                   </h3>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -491,7 +494,7 @@ function MessagesContent() {
                     No messages yet
                   </p>
                   <p className="text-xs text-slate-400 max-w-xs mt-1">
-                    Send a message to start chatting with {activeConversation.otherUserName}.
+                    Send a message to start chatting with {activeConversation.otherUserName || "this seller"}.
                   </p>
                 </div>
               ) : (

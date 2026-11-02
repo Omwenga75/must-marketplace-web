@@ -239,6 +239,10 @@ export default function ProductDetailPage() {
       router.push(`/login?redirect=/product/${product.id}`);
       return;
     }
+    if (product.sellerId === user.id || (user.phone && product.sellerPhone === user.phone)) {
+      router.push("/seller/dashboard");
+      return;
+    }
     const sellerId = product.sellerId || "demo_seller_456";
     const sellerName = product.sellerName || "Seller";
     router.push(

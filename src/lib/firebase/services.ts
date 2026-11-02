@@ -1043,9 +1043,11 @@ export function deduplicateConversations(convs: Conversation[]): Conversation[] 
   const result: Conversation[] = [];
 
   // Sort by lastMessageTime descending (most recent first)
-  const sorted = [...convs].sort(
-    (a, b) => Number(b.lastMessageTime || 0) - Number(a.lastMessageTime || 0)
-  );
+  const sorted = [...convs].sort((a, b) => {
+    const timeA = a?.lastMessageTime ? (isNaN(Number(a.lastMessageTime)) ? new Date(a.lastMessageTime).getTime() : Number(a.lastMessageTime)) : 0;
+    const timeB = b?.lastMessageTime ? (isNaN(Number(b.lastMessageTime)) ? new Date(b.lastMessageTime).getTime() : Number(b.lastMessageTime)) : 0;
+    return (timeB || 0) - (timeA || 0);
+  });
 
   for (const c of sorted) {
     if (!c) continue;
@@ -1058,19 +1060,38 @@ export function deduplicateConversations(convs: Conversation[]): Conversation[] 
     if (idKey) seen.add(`id:${idKey}`);
     if (nameKey) seen.add(`name:${nameKey}`);
 
-    result.push(c);
+    result.push({
+      ...c,
+      id: c.id || idKey,
+      otherUserId: c.otherUserId || "",
+      otherUserName: c.otherUserName || "MUST Comrade",
+      lastMessage: c.lastMessage || "",
+      lastMessageTime: c.lastMessageTime || String(Date.now()),
+      unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
+    });
   }
 
   return result;
 }
 
 export function getLocalConversations(userId: string): Conversation[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !userId) return [];
   try {
     const stored = localStorage.getItem(`must_conversations_${userId}`);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) return deduplicateConversations(parsed);
+      if (Array.isArray(parsed)) {
+        const sanitized = parsed.map((item: any) => ({
+          ...item,
+          id: item?.id || "",
+          otherUserId: item?.otherUserId || "",
+          otherUserName: item?.otherUserName || "MUST Comrade",
+          lastMessage: item?.lastMessage || "",
+          lastMessageTime: item?.lastMessageTime || String(Date.now()),
+          unreadCount: typeof item?.unreadCount === "number" ? item.unreadCount : 0,
+        }));
+        return deduplicateConversations(sanitized);
+      }
     }
   } catch {}
   return [];
@@ -1155,11 +1176,25 @@ export function subscribeToConversations(
         (snapshot) => {
           if (snapshot.exists()) {
             const val = snapshot.val();
-            const list: Conversation[] = Object.keys(val).map((k) => ({
-              ...val[k],
-              id: k,
-            }));
-            list.sort((a, b) => Number(b.lastMessageTime) - Number(a.lastMessageTime));
+            const list: Conversation[] = Object.keys(val).map((k) => {
+              const item = val[k] || {};
+              let otherId = item.otherUserId;
+              if (!otherId && k.includes("_")) {
+                const parts = k.split("_");
+                otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
+              }
+              return {
+                id: k,
+                otherUserId: otherId || "",
+                otherUserName: item.otherUserName || "MUST Comrade",
+                lastMessage: item.lastMessage || "",
+                lastMessageTime: item.lastMessageTime || String(Date.now()),
+                unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
+                productId: item.productId || null,
+                productTitle: item.productTitle || null,
+                otherUserPhoto: item.otherUserPhoto || null,
+              };
+            });
             const cleanedList = deduplicateConversations(list);
             saveLocalConversations(userId, cleanedList);
             callback(cleanedList);
@@ -1457,11 +1492,14 @@ export function markConversationAsRead(userId: string, conversationId: string) {
     }).catch(() => {});
   }
 
-  // 3. Update Firebase RTDB if available
+  // 3. Update Firebase RTDB if available (only if conversation node already exists to avoid creating empty stubs)
   if (database) {
     try {
-      update(ref(database, `conversations/${userId}/${conversationId}`), {
-        unreadCount: 0,
+      const convNodeRef = ref(database, `conversations/${userId}/${conversationId}`);
+      get(convNodeRef).then((snap) => {
+        if (snap.exists()) {
+          update(convNodeRef, { unreadCount: 0 }).catch(() => {});
+        }
       }).catch(() => {});
     } catch {}
   }
