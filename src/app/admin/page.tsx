@@ -455,13 +455,7 @@ export default function AdminPage() {
                   <p className="text-xs text-slate-400">Real-time marketplace audit log</p>
                 </div>
               </div>
-              {activityEvents.length > 0 && (
-                <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
-                  {activityPage * ACTIVITY_PAGE_SIZE + 1}–
-                  {Math.min((activityPage + 1) * ACTIVITY_PAGE_SIZE, activityEvents.length)} /{" "}
-                  {activityEvents.length}
-                </span>
-              )}
+
             </div>
 
             {/* Events list */}
