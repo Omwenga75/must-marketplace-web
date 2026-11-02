@@ -296,14 +296,15 @@ export default function ProductDetailPage() {
               </span>
             </div>
 
-            {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-snug">
-              {product.title}
-            </h1>
-
-            {/* Price */}
-            <div className="text-3xl font-black text-slate-900 dark:text-white">
-              {formatPrice(product.price)}
+            {/* Title & Price on one row */}
+            <div className="flex flex-wrap items-baseline gap-2.5">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-snug">
+                {product.title}
+              </h1>
+              <span className="text-xl sm:text-2xl font-bold text-slate-300 dark:text-slate-600">|</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+                {formatPrice(product.price)}
+              </span>
             </div>
 
             {/* Metadata */}

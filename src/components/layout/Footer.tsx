@@ -36,9 +36,14 @@ export default function Footer() {
               The dedicated student-to-student marketplace for Meru University of Science and
               Technology. Buy, sell, and connect safely right on campus.
             </p>
-            <div className="inline-flex items-center gap-2 text-[11px] sm:text-xs text-emerald-800 dark:text-emerald-400 bg-primary/80 dark:bg-emerald-950/60 px-3 py-1.5 rounded-full border border-primary-container dark:border-emerald-800 w-fit">
-              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-              <span>Campus Security Notice: Always meet at public places and inspect the items before paying for them.</span>
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 space-y-1 max-w-sm">
+              <p className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-200">
+                <ShieldCheck className="w-4 h-4 text-secondary shrink-0" />
+                <span>Campus Security Notice</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                Always meet at public places and inspect the items before paying for them.
+              </p>
             </div>
           </div>
 
