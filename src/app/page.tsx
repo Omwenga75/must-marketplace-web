@@ -353,7 +353,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <ProductGrid products={featuredProducts} loading={loading} columns={4} />
+        <ProductGrid products={featuredProducts} loading={loading} columns={4} scrollableOnMobile />
       </section>
 
       {/* ── RECENTLY ADDED LISTINGS ─────────────────────────────────────── */}
@@ -381,7 +381,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <ProductGrid products={recentProducts} loading={loading} columns={4} />
+        <ProductGrid products={recentProducts} loading={loading} columns={4} scrollableOnMobile />
       </section>
 
       {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
