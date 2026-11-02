@@ -55,10 +55,23 @@ export default function SellerActivatePage() {
   if (!user) {
     if (authLoading) {
       return (
-        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
-          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        <div className="max-w-xl mx-auto px-4 py-12 space-y-6 animate-pulse">
+          <div className="text-center space-y-2 mb-8">
+            <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
+            <div className="h-7 bg-slate-200 dark:bg-slate-700 rounded-lg w-56 mx-auto" />
+            <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-80 mx-auto" />
+          </div>
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+            <div className="space-y-2">
+              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+              <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28" />
+              <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+            </div>
+            <div className="h-11 bg-slate-200 dark:bg-slate-700 rounded-xl w-full mt-2" />
+          </div>
         </div>
       );
     }

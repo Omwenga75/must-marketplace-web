@@ -101,10 +101,70 @@ export default function SellerDashboardPage() {
   if (!user) {
     if (authLoading) {
       return (
-        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
-          <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-700 mx-auto" />
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
-          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-pulse">
+          {/* Header Row Skeleton */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200/80 dark:border-slate-800">
+            <div className="space-y-2">
+              <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg w-56" />
+              <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-72" />
+            </div>
+            <div className="h-11 bg-slate-200 dark:bg-slate-700 rounded-xl w-36 self-start sm:self-auto" />
+          </div>
+
+          {/* 4 Stat Cards Skeleton */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                  <div className="h-4 w-4 rounded-full bg-slate-200 dark:bg-slate-700" />
+                </div>
+                <div className="h-7 bg-slate-200 dark:bg-slate-700 rounded w-14" />
+                <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-28" />
+              </div>
+            ))}
+          </div>
+
+          {/* Section Header Skeleton */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-60" />
+                <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-80" />
+              </div>
+              <div className="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl w-48 self-start sm:self-auto" />
+            </div>
+
+            {/* 2-in-a-row listing card skeletons */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3 min-h-[96px]"
+                >
+                  <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-28" />
+                        <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-full w-12" />
+                      </div>
+                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-16" />
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-24" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="h-8 w-8 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+                    <div className="h-8 w-20 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+                    <div className="h-8 w-8 bg-slate-200 dark:bg-slate-700 rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       );
     }

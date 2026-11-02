@@ -52,10 +52,40 @@ export default function ProfilePage() {
   if (!user) {
     if (authLoading) {
       return (
-        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4 animate-pulse">
-          <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 mx-auto" />
-          <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-40 mx-auto" />
-          <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full w-56 mx-auto" />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-pulse">
+          {/* Header Skeleton */}
+          <div className="space-y-2 pb-6 border-b border-slate-200/80 dark:border-slate-800">
+            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded-lg w-48" />
+            <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-72" />
+          </div>
+
+          {/* Profile Card Skeleton */}
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+              <div className="w-20 h-20 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0" />
+              <div className="space-y-2 text-center sm:text-left flex-1">
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-36 mx-auto sm:mx-0" />
+                <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded w-48 mx-auto sm:mx-0" />
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-24 mx-auto sm:mx-0 mt-2" />
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="space-y-2">
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-20" />
+                <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" />
+                <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-28" />
+                <div className="h-11 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+              </div>
+              <div className="h-11 bg-slate-200 dark:bg-slate-700 rounded-xl w-32" />
+            </div>
+          </div>
         </div>
       );
     }
