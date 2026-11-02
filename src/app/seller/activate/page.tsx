@@ -12,7 +12,9 @@ export default function SellerActivatePage() {
   const router = useRouter();
   const { user, loading: authLoading, refreshUserData, updateUserProfile } = useAuth();
 
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [phone, setPhone] = useState(
+    user?.phone ? user.phone.replace(/^\+254\s?/, "") : ""
+  );
   const [location, setLocation] = useState(user?.location || "Main Gate");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -25,18 +27,24 @@ export default function SellerActivatePage() {
       return;
     }
 
-    if (!phone.trim()) {
-      setError("Please provide a valid phone number for buyers to reach you.");
+    const digits = phone.trim().replace(/\s/g, "");
+    if (!digits) {
+      setError("Please enter your phone number.");
       return;
     }
+    if (!/^[17]\d{8}$/.test(digits)) {
+      setError("Enter exactly 9 digits starting with 1 or 7 (e.g. 712 345 678).");
+      return;
+    }
+    const fullPhone = `+254 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
 
     setError("");
     setLoading(true);
 
     try {
-      await becomeSeller(user.id, phone.trim(), location);
+      await becomeSeller(user.id, fullPhone, location);
       await updateUserProfile({
-        phone: phone.trim(),
+        phone: fullPhone,
         location,
         seller: true,
         isSeller: true,
@@ -144,20 +152,41 @@ export default function SellerActivatePage() {
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                 Phone Number / WhatsApp
               </label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500/30">
+                {/* Fixed +254 prefix */}
+                <div className="flex items-center gap-1.5 px-3.5 border-r border-slate-200 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-700/60 select-none">
+                  <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-sm font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">+254</span>
+                </div>
                 <input
                   type="tel"
                   required
-                  placeholder="+254 712 345 678"
+                  placeholder="712 345 678"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  onChange={(e) => {
+                    // Allow only digits and spaces, max 9 digits
+                    const raw = e.target.value.replace(/[^\d\s]/g, "");
+                    const digitsOnly = raw.replace(/\s/g, "");
+                    if (digitsOnly.length <= 9) setPhone(raw);
+                  }}
+                  inputMode="numeric"
+                  maxLength={11} // 9 digits + 2 spaces
+                  className="flex-1 px-3.5 py-2.5 text-sm bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none"
                 />
+                <span className={`flex items-center pr-3.5 text-xs font-semibold tabular-nums ${
+                  phone.replace(/\s/g, "").length === 9 ? "text-emerald-500" : "text-slate-400"
+                }`}>
+                  {phone.replace(/\s/g, "").length}/9
+                </span>
               </div>
               <p className="text-[11px] text-slate-400">
                 Buyers will use this number to contact you or send WhatsApp inquiries.
               </p>
+              {phone.replace(/\s/g, "").length > 0 && !/^[17]/.test(phone.replace(/\s/g, "")) && (
+                <p className="text-[11px] text-rose-500 font-semibold">
+                  Number must start with 1 or 7 after +254
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

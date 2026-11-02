@@ -392,6 +392,16 @@ export default function Navbar() {
                           <span>Saved Products ({mounted ? favoriteIds.size : 0})</span>
                         </Link>
 
+                    {isUserAdmin && (
+                      <Link
+                        href="/admin"
+                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-orange-600 dark:text-orange-400 font-semibold hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Admin Console</span>
+                      </Link>
+                    )}
+
                     <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                     <button

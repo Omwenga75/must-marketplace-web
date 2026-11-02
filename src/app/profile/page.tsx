@@ -37,14 +37,16 @@ export default function ProfilePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user?.fullName || "");
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [phone, setPhone] = useState(
+    user?.phone ? user.phone.replace(/^\+254\s?/, "") : ""
+  );
   const [location, setLocation] = useState(user?.location || "Main Gate");
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     if (user) {
       setFullName(user.fullName || "");
-      setPhone(user.phone || "");
+      setPhone(user.phone ? user.phone.replace(/^\+254\s?/, "") : "");
       setLocation(user.location || "Main Gate");
     }
   }, [user]);
@@ -112,10 +114,16 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
 
+    // Build full phone from the 9-digit input
+    const digits = phone.trim().replace(/\s/g, "");
+    const fullPhone = digits
+      ? `+254 ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+      : null;
+
     try {
       await updateUserProfile({
         fullName: fullName.trim() || user.fullName,
-        phone: phone.trim() ? phone.trim() : null,
+        phone: fullPhone,
         location: location || "Main Gate",
       });
       setIsEditing(false);
@@ -224,13 +232,35 @@ export default function ProfilePage() {
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Phone / WhatsApp Number
                 </label>
-                <input
-                  type="text"
-                  placeholder="+254 712 345 678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
-                />
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-emerald-500/30">
+                  <div className="flex items-center gap-1.5 px-3 border-r border-slate-200 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-700/60 select-none">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">+254</span>
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="712 345 678"
+                    value={phone}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^\d\s]/g, "");
+                      const digitsOnly = raw.replace(/\s/g, "");
+                      if (digitsOnly.length <= 9) setPhone(raw);
+                    }}
+                    inputMode="numeric"
+                    maxLength={11}
+                    className="flex-1 px-3 py-2.5 text-xs bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none"
+                  />
+                  <span className={`flex items-center pr-3 text-[10px] font-semibold tabular-nums ${
+                    phone.replace(/\s/g, "").length === 9 ? "text-emerald-500" : "text-slate-400"
+                  }`}>
+                    {phone.replace(/\s/g, "").length}/9
+                  </span>
+                </div>
+                {phone.replace(/\s/g, "").length > 0 && !/^[17]/.test(phone.replace(/\s/g, "")) && (
+                  <p className="text-[10px] text-rose-500 font-semibold">
+                    Must start with 1 or 7 after +254
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">

@@ -29,8 +29,12 @@ export default function RegisterPage() {
     setError("");
 
     const trimmedFullName = fullName.trim();
-    if (!trimmedFullName || trimmedFullName.length < 2) {
-      setError("Please enter your full name.");
+    if (!trimmedFullName || trimmedFullName.length < 7) {
+      setError("Full name must be at least 7 characters.");
+      return;
+    }
+    if (trimmedFullName.length > 15) {
+      setError("Full name must not exceed 15 characters.");
       return;
     }
 
@@ -113,11 +117,24 @@ export default function RegisterPage() {
                   name="reg_student_fullname"
                   placeholder="Enter your full name"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => setFullName(e.target.value.slice(0, 15))}
+                  maxLength={15}
                   autoComplete="off"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  className="w-full pl-10 pr-12 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                 />
+                <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold tabular-nums ${
+                  fullName.trim().length > 0 && fullName.trim().length < 7
+                    ? "text-rose-400"
+                    : fullName.trim().length >= 15
+                    ? "text-amber-400"
+                    : "text-slate-400"
+                }`}>
+                  {fullName.trim().length}/15
+                </span>
               </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                Between 7 and 15 characters
+              </p>
             </div>
 
             <div className="space-y-1.5">
