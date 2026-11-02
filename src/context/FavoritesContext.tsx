@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { getUserFavorites, toggleFavorite } from "@/lib/firebase/services";
 import { database } from "@/lib/firebase/config";
@@ -110,8 +110,17 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // In-flight mutex lock so rapid taps or multi-card clicks cannot fire concurrent writes
+  const inFlightRef = useRef<Set<string>>(new Set());
+
   const toggle = async (productId: string): Promise<boolean> => {
-    if (!user?.id) return false;
+    if (!user?.id || !productId) return false;
+
+    // Block concurrent toggle on the same product
+    if (inFlightRef.current.has(productId)) {
+      return favoriteIds.has(productId);
+    }
+    inFlightRef.current.add(productId);
 
     const isCurrentlyFav = favoriteIds.has(productId);
     const nextIsFav = !isCurrentlyFav;
@@ -146,6 +155,8 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
       return isCurrentlyFav;
+    } finally {
+      inFlightRef.current.delete(productId);
     }
   };
 

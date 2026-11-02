@@ -54,18 +54,13 @@ export default function ProductGrid({
     const count = columns === 4 ? 4 : 8;
     if (scrollableOnMobile) {
       return (
-        <>
-          {/* Mobile: horizontal scroll */}
-          <div className={`${mobileScrollClasses} sm:hidden`}>
-            {Array.from({ length: count }).map((_, i) => (
-              <div key={i} className="shrink-0 w-[160px]">{skeletonCard(i)}</div>
-            ))}
-          </div>
-          {/* sm+: normal grid */}
-          <div className={`hidden sm:grid ${gridClasses}`}>
-            {Array.from({ length: count }).map((_, i) => skeletonCard(i))}
-          </div>
-        </>
+        <div className="flex sm:grid overflow-x-auto sm:overflow-visible gap-3 sm:gap-5 pb-3 sm:pb-0 pt-1 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+          {Array.from({ length: count }).map((_, i) => (
+            <div key={i} className="shrink-0 w-[185px] sm:shrink sm:w-auto">
+              {skeletonCard(i)}
+            </div>
+          ))}
+        </div>
       );
     }
     return (
@@ -103,7 +98,7 @@ export default function ProductGrid({
     return (
       <div className="flex sm:grid overflow-x-auto sm:overflow-visible gap-3 sm:gap-5 pb-3 sm:pb-0 pt-1 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
         {products.map((product) => (
-          <div key={product.id} className="shrink-0 w-[160px] sm:shrink sm:w-auto">
+          <div key={product.id} className="shrink-0 w-[185px] sm:shrink sm:w-auto">
             <ProductCard product={product} />
           </div>
         ))}

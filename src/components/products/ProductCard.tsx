@@ -100,10 +100,11 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
     if (isTogglingFav) return;
     setIsTogglingFav(true);
-    const nextIsFav = !favorited;
-    setLikesCount((prev) => (nextIsFav ? prev + 1 : Math.max(0, prev - 1)));
-    await toggle(product.id);
-    setIsTogglingFav(false);
+    try {
+      await toggle(product.id);
+    } finally {
+      setIsTogglingFav(false);
+    }
   };
 
   const isSold = product.status === "SOLD";
@@ -225,8 +226,8 @@ export default function ProductCard({ product }: ProductCardProps) {
           </h3>
         </Link>
 
-        <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <div className="w-5 h-5 rounded-full bg-primary-container text-primary-dark font-bold text-[10px] flex items-center justify-center shrink-0">
               {product.sellerName ? product.sellerName.charAt(0) : "S"}
             </div>
@@ -235,28 +236,31 @@ export default function ProductCard({ product }: ProductCardProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-            <Eye className="w-3.5 h-3.5" />
-            <span>{product.views || 0}</span>
-          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+              <Eye className="w-3.5 h-3.5 shrink-0" />
+              <span>{product.views || 0}</span>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleFavoriteClick}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-              favorited
-                ? "bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/60 shadow-xs"
-                : "text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-            }`}
-            title={favorited ? "Unlike product" : "Like product"}
-          >
-            <Heart
-              className={`w-3.5 h-3.5 transition-transform active:scale-125 ${
-                favorited ? "fill-rose-500 text-rose-500" : "text-slate-400"
+            <button
+              type="button"
+              onClick={handleFavoriteClick}
+              disabled={isTogglingFav}
+              className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                favorited
+                  ? "bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/80 dark:border-rose-900/60 shadow-xs"
+                  : "text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               }`}
-            />
-            <span>{likesCount}</span>
-          </button>
+              title={favorited ? "Unlike product" : "Like product"}
+            >
+              <Heart
+                className={`w-3.5 h-3.5 shrink-0 transition-transform active:scale-125 ${
+                  favorited ? "fill-rose-500 text-rose-500" : "text-slate-400"
+                }`}
+              />
+              <span>{likesCount}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
