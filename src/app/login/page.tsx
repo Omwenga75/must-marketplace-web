@@ -213,9 +213,27 @@ function LoginForm() {
   );
 }
 
+function LoginSkeleton() {
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6 animate-pulse">
+        <div className="space-y-2 text-center">
+          <div className="h-8 w-40 bg-slate-200 dark:bg-slate-800 rounded-xl mx-auto" />
+          <div className="h-4 w-60 bg-slate-100 dark:bg-slate-800/60 rounded-lg mx-auto" />
+        </div>
+        <div className="space-y-4">
+          <div className="h-12 bg-slate-100 dark:bg-slate-800/60 rounded-xl" />
+          <div className="h-12 bg-slate-100 dark:bg-slate-800/60 rounded-xl" />
+          <div className="h-12 bg-emerald-600/30 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs text-slate-400">Loading...</div>}>
+    <Suspense fallback={<LoginSkeleton />}>
       <LoginForm />
     </Suspense>
   );

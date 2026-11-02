@@ -471,9 +471,29 @@ function MarketplaceContent() {
   );
 }
 
+function MarketplaceSkeleton() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-6 sm:py-10 animate-pulse">
+      {/* Filters & Categories Skeleton Row */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none pt-1">
+        <div className="h-8 w-20 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="h-8 w-28 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-1 shrink-0" />
+        <div className="h-8 w-16 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="h-8 w-24 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="h-8 w-24 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+        <div className="h-8 w-24 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0" />
+      </div>
+
+      {/* Product Grid Skeleton */}
+      <ProductGrid loading={true} products={[]} columns={4} />
+    </div>
+  );
+}
+
 export default function MarketplacePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs text-slate-400">Loading marketplace...</div>}>
+    <Suspense fallback={<MarketplaceSkeleton />}>
       <MarketplaceContent />
     </Suspense>
   );
