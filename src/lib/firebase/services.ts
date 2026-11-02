@@ -2111,7 +2111,7 @@ export async function fetchAllUsers(): Promise<User[]> {
     const existing = usersMap.get(key) || (id ? usersMap.get(id) : undefined);
 
     const isSeller = Boolean(u.seller || u.isSeller || existing?.seller || existing?.isSeller);
-    const isAdmin = Boolean(u.admin || u.isAdmin || email === "must.market@admin.com" || email === "eronmuzk@gmail.com" || email === "admin@must.ac.ke");
+    const isAdmin = Boolean(u.admin || u.isAdmin || email === "must.market@admin.com" || email === "admin@must.ac.ke");
 
     const merged: User = {
       ...(existing || {}),

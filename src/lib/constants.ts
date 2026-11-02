@@ -27,6 +27,8 @@ export const UNIVERSITY_LOCATIONS = [
   "Ebony",
   "KeMU",
   "Junction",
+  "Quiver",
+  "KAN",
   "Other",
 ] as const;
 

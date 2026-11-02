@@ -70,6 +70,7 @@ export default function ProductDetailPage() {
     getProductById(productId)
       .then((data) => {
         setProduct(data);
+        document.title = `${data.title} | Ksh ${data.price}`;
         setLoading(false);
         if (data && user?.id) {
           recordProductView(data.id, user.id);
@@ -106,6 +107,7 @@ export default function ProductDetailPage() {
     window.addEventListener("storage", onStorage);
 
     return () => {
+      document.title = "MUST Marketplace";
       window.removeEventListener("must_product_deleted", onDeleted);
       window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
@@ -133,7 +135,6 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-pulse space-y-6">
-        <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-28" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
           <div className="lg:col-span-6">
             <div className="w-full max-w-[460px] aspect-square bg-slate-200 dark:bg-slate-800 rounded-3xl mx-auto lg:mx-0" />

@@ -203,7 +203,7 @@ export default function HomePage() {
                     </span>
                   </div>
                   <span className="text-[10px] font-semibold text-secondary uppercase tracking-wider">
-                    MUST Verified
+                    Promoted Items
                   </span>
                 </div>
 
@@ -252,7 +252,7 @@ export default function HomePage() {
                     href="/marketplace"
                     className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                   >
-                    View 50+ items →
+                    View all items →
                   </Link>
                 </div>
               </div>
@@ -404,13 +404,13 @@ export default function HomePage() {
               </p>
             </div>
 
-            {/* Step 3 */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-primary-container text-primary-dark font-black flex items-center justify-center text-lg">
-                3
+            {/* Step 3 - Campus Security Notice */}
+            <div className="p-5 rounded-2xl bg-amber-950/30 border border-amber-800/60 space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+                <h3 className="font-bold text-base text-amber-200">Campus Security Notice</h3>
               </div>
-              <h3 className="font-bold text-base text-white">Meet On-Campus & Transact</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-amber-300/90 leading-relaxed">
                 Always meet at public places and inspect the items before paying for them.
               </p>
             </div>
