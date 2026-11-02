@@ -61,7 +61,7 @@ function ChatBubbleSkeleton({ isMine }: { isMine: boolean }) {
 function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading, loginAsDemoUser } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Query parameters when arriving from a product page
   const sellerIdQuery = searchParams.get("sellerId");
@@ -88,12 +88,18 @@ function MessagesContent() {
     window.scrollTo(0, 0);
   }, []);
 
-  // Auto-connect as student comrade if unauthenticated (no blocking fallback screen)
+  // Redirect unauthenticated users to login
   useEffect(() => {
     if (!authLoading && !user) {
-      loginAsDemoUser("buyer");
+      const params = new URLSearchParams();
+      if (sellerIdQuery) params.set('sellerId', sellerIdQuery);
+      if (sellerNameQuery) params.set('sellerName', sellerNameQuery);
+      if (productIdQuery) params.set('productId', productIdQuery);
+      if (productTitleQuery) params.set('productTitle', productTitleQuery);
+      const msgRedirect = params.toString() ? '/messages?' + params.toString() : '/messages';
+      router.replace('/login?redirect=' + encodeURIComponent(msgRedirect));
     }
-  }, [authLoading, user, loginAsDemoUser]);
+  }, [authLoading, user, sellerIdQuery, sellerNameQuery, productIdQuery, productTitleQuery]);
 
   // Internal scroll function strictly scoped to the chat div
   const scrollChatToBottom = (smooth = false) => {

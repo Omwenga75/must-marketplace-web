@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Heart, MapPin } from "lucide-react";
+import { Heart, MapPin, Eye } from "lucide-react";
 import { Product } from "@/types";
 import { formatPrice } from "@/lib/utils";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -211,6 +211,11 @@ export default function ProductCard({ product }: ProductCardProps) {
             <span className="truncate font-medium text-[11px] text-slate-700 dark:text-slate-300">
               {product.sellerName || "Verified Seller"}
             </span>
+          </div>
+
+          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+            <Eye className="w-3.5 h-3.5" />
+            <span>{product.views || 0}</span>
           </div>
 
           <button
