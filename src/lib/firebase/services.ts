@@ -511,13 +511,12 @@ export async function toggleFavorite(
 
     // Dispatch real-time events across components in the current window
     if (typeof window !== "undefined") {
-      if (trueLikesCount > 0) {
-        window.dispatchEvent(
-          new CustomEvent("must_product_likes_changed", {
-            detail: { productId, likes: trueLikesCount },
-          })
-        );
-      }
+      // Always dispatch — even when trueLikesCount is 0 (e.g. last like removed)
+      window.dispatchEvent(
+        new CustomEvent("must_product_likes_changed", {
+          detail: { productId, likes: trueLikesCount },
+        })
+      );
       window.dispatchEvent(
         new CustomEvent("must_favorites_updated", {
           detail: { productId, isFavorited: isNowLiked },

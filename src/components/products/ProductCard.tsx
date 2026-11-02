@@ -25,13 +25,18 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [isTogglingFav, setIsTogglingFav] = useState(false);
   // Authoritative live likes count from Firebase product data
   const [likesCount, setLikesCount] = useState<number>(() => Number(product.likes) || 0);
+  // Live views count from Firebase
+  const [viewsCount, setViewsCount] = useState<number>(() => Number(product.views) || 0);
 
   // Keep synced with props
   useEffect(() => {
     if (typeof product.likes === "number") {
       setLikesCount(product.likes);
     }
-  }, [product.likes]);
+    if (typeof product.views === "number") {
+      setViewsCount(product.views);
+    }
+  }, [product.likes, product.views]);
 
   // Live real-time WebSocket listener from Firebase RTDB (single source of truth)
   useEffect(() => {
@@ -42,6 +47,21 @@ export default function ProductCard({ product }: ProductCardProps) {
         const val = snap.val();
         if (typeof val === "number") {
           setLikesCount(val);
+        }
+      });
+      return () => unsub();
+    } catch {}
+  }, [product.id]);
+
+  // Live real-time views listener from Firebase RTDB
+  useEffect(() => {
+    if (!database || !product.id) return;
+    try {
+      const viewsRef = ref(database, `products/${product.id}/views`);
+      const unsub = onValue(viewsRef, (snap) => {
+        const val = snap.val();
+        if (typeof val === "number") {
+          setViewsCount(val);
         }
       });
       return () => unsub();
@@ -240,7 +260,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
               <Eye className="w-3.5 h-3.5 shrink-0" />
-              <span>{product.views || 0}</span>
+              <span>{viewsCount}</span>
             </div>
 
             <button

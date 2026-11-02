@@ -68,18 +68,20 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
           const val = snapshot.val();
           if (val && typeof val === "object") {
             const ids = Object.keys(val).filter((k) => Boolean(val[k]));
-            setRawFavoriteIds((prev) => {
-              const merged = new Set(prev);
-              ids.forEach((id) => merged.add(id));
-              return merged;
-            });
+            // REPLACE with server state — do NOT merge, otherwise an unlikes item
+            // gets re-added when the Firebase onValue fires after the local delete.
+            setRawFavoriteIds(new Set(ids));
             if (typeof window !== "undefined") {
               try {
                 localStorage.setItem(`must_fav_${user.id}`, JSON.stringify(ids));
+                localStorage.setItem("must_favorites", JSON.stringify(ids));
               } catch {}
             }
           }
+          // snapshot.exists() but empty val → no-op (keep current local state)
         }
+        // snapshot does NOT exist → Firebase has no favorites for this user yet.
+        // Keep whatever is in local state; do NOT wipe it.
         setLoading(false);
       },
       (err) => {
