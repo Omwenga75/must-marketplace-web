@@ -59,6 +59,52 @@ function ChatBubbleSkeleton({ isMine }: { isMine: boolean }) {
   );
 }
 
+function MessagesPageSkeleton() {
+  return (
+    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex animate-pulse">
+      {/* ── LEFT SIDEBAR SKELETON ── */}
+      <aside className="w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="h-6 w-24 bg-slate-200 dark:bg-slate-800 rounded-lg" />
+          <div className="h-9 w-full bg-slate-100 dark:bg-slate-800 rounded-xl" />
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <ConversationItemSkeleton key={i} />
+          ))}
+        </div>
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 shrink-0" />
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 rounded" />
+            <div className="h-2.5 w-16 bg-slate-100 dark:bg-slate-800 rounded" />
+          </div>
+        </div>
+      </aside>
+
+      {/* ── RIGHT CHAT WINDOW SKELETON (Desktop) ── */}
+      <main className="hidden md:flex flex-1 flex-col h-full bg-white dark:bg-slate-950 min-w-0">
+        <div className="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 shrink-0" />
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="h-3.5 w-32 bg-slate-200 dark:bg-slate-800 rounded" />
+            <div className="h-2.5 w-20 bg-slate-100 dark:bg-slate-800 rounded" />
+          </div>
+        </div>
+        <div className="flex-1 p-4 space-y-4 flex flex-col justify-end">
+          <ChatBubbleSkeleton isMine={false} />
+          <ChatBubbleSkeleton isMine={true} />
+          <ChatBubbleSkeleton isMine={false} />
+          <ChatBubbleSkeleton isMine={true} />
+        </div>
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+          <div className="h-10 w-full bg-slate-100 dark:bg-slate-800 rounded-full" />
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -379,6 +425,10 @@ function MessagesContent() {
     })
   );
 
+  if (authLoading) {
+    return <MessagesPageSkeleton />;
+  }
+
   return (
     <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex">
       {/* ── LEFT SIDEBAR: Direct Conversations ───────────────────────────────── */}
@@ -658,7 +708,7 @@ function MessagesContent() {
 
 export default function MessagesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-xs text-slate-400">Loading messages...</div>}>
+    <Suspense fallback={<MessagesPageSkeleton />}>
       <MessagesContent />
     </Suspense>
   );

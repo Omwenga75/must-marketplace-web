@@ -329,8 +329,20 @@ export default function AdminPage() {
   // ── Loading / guard states ─────────────────────────────────────────────────
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8 animate-pulse">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+          <div className="space-y-2">
+            <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg w-48" />
+            <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded w-64" />
+          </div>
+          <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-xl w-40" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+          ))}
+        </div>
+        <div className="h-96 rounded-2xl bg-slate-200 dark:bg-slate-800" />
       </div>
     );
   }
