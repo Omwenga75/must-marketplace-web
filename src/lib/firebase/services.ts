@@ -459,37 +459,42 @@ export async function toggleFavorite(productId: string, userId?: string): Promis
   if (!database) return false;
 
   try {
+    const prodLikeRef = ref(database, `product_likes/${productId}/${userId}`);
     const favRef = ref(database, `favorites/${userId}/${productId}`);
-    const snap = await get(favRef);
-    const currentlyFavorited = snap.exists() && snap.val() === true;
-    const isNowFavorited = !currentlyFavorited;
 
-    if (isNowFavorited) {
-      await set(favRef, true);
+    const [prodLikeSnap, favSnap] = await Promise.all([
+      get(prodLikeRef),
+      get(favRef),
+    ]);
+    const currentlyLiked =
+      (prodLikeSnap.exists() && prodLikeSnap.val() === true) ||
+      (favSnap.exists() && favSnap.val() === true);
+    const isNowLiked = !currentlyLiked;
+
+    if (isNowLiked) {
+      await Promise.all([
+        set(prodLikeRef, true),
+        set(favRef, true),
+      ]);
     } else {
-      await remove(favRef);
+      await Promise.all([
+        remove(prodLikeRef),
+        remove(favRef),
+      ]);
     }
 
-    // Atomically update product likes count in Firebase RTDB
+    // Atomically increment or decrement products/${productId}/likes in Firebase RTDB
     const likesRef = ref(database, `products/${productId}/likes`);
     const txResult = await runTransaction(likesRef, (current) => {
       const val = typeof current === "number" ? current : 0;
-      return isNowFavorited ? val + 1 : Math.max(0, val - 1);
+      return isNowLiked ? val + 1 : Math.max(0, val - 1);
     });
 
-    const newLikesCount = typeof txResult.snapshot.val() === "number" ? txResult.snapshot.val() : 0;
+    const newLikesCount =
+      typeof txResult.snapshot.val() === "number" ? txResult.snapshot.val() : 0;
 
-    // Update local favorite set
+    // Dispatch real-time events across components in the current window
     if (typeof window !== "undefined") {
-      try {
-        const unified = JSON.parse(localStorage.getItem(UNIFIED_FAVORITES_KEY) || "[]");
-        const setIds = new Set(Array.isArray(unified) ? unified : []);
-        if (isNowFavorited) setIds.add(productId);
-        else setIds.delete(productId);
-        localStorage.setItem(UNIFIED_FAVORITES_KEY, JSON.stringify([...setIds]));
-      } catch {}
-
-      // Dispatch real-time events across components
       window.dispatchEvent(
         new CustomEvent("must_product_likes_changed", {
           detail: { productId, likes: newLikesCount },
@@ -497,71 +502,32 @@ export async function toggleFavorite(productId: string, userId?: string): Promis
       );
       window.dispatchEvent(
         new CustomEvent("must_favorites_updated", {
-          detail: { productId, isFavorited: isNowFavorited },
+          detail: { productId, isFavorited: isNowLiked },
         })
       );
     }
 
-    return isNowFavorited;
+    return isNowLiked;
   } catch (err) {
-    console.error("toggleFavorite transaction error:", err);
+    console.error("toggleFavorite error:", err);
     return false;
   }
 }
 
 export async function getUserFavorites(userId?: string): Promise<string[]> {
-  const combined = new Set<string>();
-
-  // 1. Read local stores immediately
-  if (typeof window !== "undefined") {
-    try {
-      const unified = JSON.parse(localStorage.getItem(UNIFIED_FAVORITES_KEY) || "[]");
-      if (Array.isArray(unified)) unified.forEach((id: string) => combined.add(id));
-
-      const guest = JSON.parse(localStorage.getItem(GUEST_FAVORITES_KEY) || "[]");
-      if (Array.isArray(guest)) guest.forEach((id: string) => combined.add(id));
-
-      if (userId) {
-        const userFavs = JSON.parse(localStorage.getItem(`must_fav_${userId}`) || "{}");
-        Object.keys(userFavs).forEach((id) => combined.add(id));
+  if (!userId || !database) return [];
+  try {
+    const snap = await get(ref(database, `favorites/${userId}`));
+    if (snap.exists()) {
+      const val = snap.val();
+      if (val && typeof val === "object") {
+        return Object.keys(val).filter((k) => Boolean(val[k]));
       }
-    } catch {}
+    }
+  } catch (err) {
+    console.warn("getUserFavorites error:", err);
   }
-
-  // 2. Try background Firebase RTDB read if user is logged in (with 400ms timeout race)
-  if (database && userId) {
-    try {
-      const snapPromise = get(ref(database, `favorites/${userId}`));
-      const snap = await Promise.race([
-        snapPromise,
-        new Promise<null>((res) => setTimeout(() => res(null), 400)),
-      ]);
-      if (snap && snap.exists()) {
-        const val = snap.val();
-        if (val && typeof val === "object") {
-          Object.keys(val).forEach((id) => combined.add(id));
-        }
-      }
-    } catch {}
-  }
-
-  const result = Array.from(combined);
-  // Persist back so all stores remain synchronized
-  if (typeof window !== "undefined" && result.length > 0) {
-    try {
-      localStorage.setItem(UNIFIED_FAVORITES_KEY, JSON.stringify(result));
-      localStorage.setItem(GUEST_FAVORITES_KEY, JSON.stringify(result));
-      if (userId) {
-        const userObj: Record<string, boolean> = {};
-        result.forEach((id) => {
-          userObj[id] = true;
-        });
-        localStorage.setItem(`must_fav_${userId}`, JSON.stringify(userObj));
-      }
-    } catch {}
-  }
-
-  return result;
+  return [];
 }
 
 // Fast client-side image compression: reduces 10MB phone camera photos to ~100KB in under 60ms

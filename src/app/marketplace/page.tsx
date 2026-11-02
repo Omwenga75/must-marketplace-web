@@ -16,6 +16,8 @@ import {
 import { Product, ProductCondition } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
 import { fetchProducts } from "@/lib/firebase/services";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 import ProductGrid from "@/components/products/ProductGrid";
 
 function MarketplaceContent() {
@@ -49,6 +51,29 @@ function MarketplaceContent() {
       .catch(() => {
         setLoading(false);
       });
+
+    // Real-time Firebase listener so marketplace listings update LIVE when liked or viewed!
+    let unsubDb: (() => void) | null = null;
+    if (database) {
+      try {
+        const prodsRef = ref(database, "products");
+        unsubDb = onValue(prodsRef, (snapshot) => {
+          const val = snapshot.val();
+          if (val && typeof val === "object") {
+            const list: Product[] = Object.entries(val).map(([k, v]: [string, any]) => ({
+              ...v,
+              id: v.id || k,
+              likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
+              views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
+            }));
+            setProducts(list);
+            setLoading(false);
+          }
+        });
+      } catch (e) {
+        console.warn("Marketplace RTDB listener error:", e);
+      }
+    }
 
     const handleProductDeletedEvent = (pid: string) => {
       if (pid) setProducts((prev) => prev.filter((p) => p.id !== pid));
@@ -91,6 +116,7 @@ function MarketplaceContent() {
     window.addEventListener("storage", onStorage);
 
     return () => {
+      if (unsubDb) unsubDb();
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("must_product_created", onProductCreated);
       window.removeEventListener("storage", onStorage);
