@@ -568,7 +568,7 @@ function MessagesContent() {
                   </h3>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Active now · Student Seller</span>
+                    <span>Active now</span>
                   </p>
                 </div>
               </div>
