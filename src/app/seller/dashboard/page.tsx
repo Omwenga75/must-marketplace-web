@@ -16,11 +16,15 @@ import {
   AlertCircle,
   Sparkles,
   TrendingUp,
+  X,
+  Save,
+  Loader2,
 } from "lucide-react";
 import { Product } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { fetchProducts, updateProduct, deleteProduct } from "@/lib/firebase/services";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
+import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
 
 export default function SellerDashboardPage() {
   const router = useRouter();
@@ -29,6 +33,18 @@ export default function SellerDashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState<"ACTIVE" | "SOLD" | "ALL">("ACTIVE");
+
+  // Edit modal state
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    price: 0,
+    description: "",
+    location: "Main Gate",
+    condition: "SECOND_HAND" as Product["condition"],
+    categoryId: "1",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -134,6 +150,62 @@ export default function SellerDashboardPage() {
     }
   };
 
+  const handleOpenEdit = (p: Product) => {
+    setEditingProduct(p);
+    setEditForm({
+      title: p.title || "",
+      price: p.price || 0,
+      description: p.description || "",
+      location: p.location || "Main Gate",
+      condition: p.condition || "SECOND_HAND",
+      categoryId: p.category?.id || "1",
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setSavingEdit(true);
+
+    const matchedCat =
+      SAMPLE_CATEGORIES.find((c) => c.id === editForm.categoryId) || editingProduct.category;
+
+    const updates: Partial<Product> = {
+      title: editForm.title.trim(),
+      price: Number(editForm.price) || 0,
+      description: editForm.description.trim(),
+      location: editForm.location,
+      condition: editForm.condition,
+      category: matchedCat,
+    };
+
+    try {
+      await updateProduct(editingProduct.id, updates);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updates } : p))
+      );
+
+      // Broadcast across open tabs and windows
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel("must_marketplace_products_sync");
+          bc.postMessage({
+            type: "UPDATE",
+            productId: editingProduct.id,
+            product: { ...editingProduct, ...updates },
+          });
+          bc.close();
+        } catch {}
+      }
+
+      setEditingProduct(null);
+    } catch (err) {
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
       {/* Top Header */}
@@ -172,82 +244,106 @@ export default function SellerDashboardPage() {
           <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
             {activeCount}
           </p>
-          <p className="text-[11px] text-slate-500">Live in marketplace</p>
+          <p className="text-[11px] text-slate-400">Live on marketplace</p>
+        </div>
+
+        {/* Sold Listings */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-400">
+            <span className="text-xs font-bold uppercase tracking-wider">Sold Items</span>
+            <CheckCircle2 className="w-4 h-4 text-secondary" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+            {soldCount}
+          </p>
+          <p className="text-[11px] text-slate-400">Successfully completed</p>
         </div>
 
         {/* Total Views */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Views</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Impressions</span>
             <Eye className="w-4 h-4 text-blue-500" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
             {totalViews}
           </p>
-          <p className="text-[11px] text-slate-500">Student impressions</p>
+          <p className="text-[11px] text-slate-400">Total student views</p>
         </div>
 
-        {/* Favorites / Likes */}
+        {/* Total Favorites */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Bookmarks</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Favorites</span>
             <Heart className="w-4 h-4 text-rose-500" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
             {totalLikes}
           </p>
-          <p className="text-[11px] text-slate-500">Comrades interested</p>
-        </div>
-
-        {/* Sold Items */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Items Sold</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-            {soldCount}
-          </p>
-          <p className="text-[11px] text-slate-500">Completed deals</p>
+          <p className="text-[11px] text-slate-400">Saved by comrades</p>
         </div>
       </div>
 
-      {/* Listings Section */}
+      {/* Listings Management */}
       <div className="space-y-4">
-        {/* Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-          {(["ACTIVE", "SOLD", "ALL"] as const).map((tab) => (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Your Campus Listings ({displayedListings.length})
+            </h2>
+            <p className="text-xs text-slate-500">
+              Manage status, edit details, or remove sold advertisements
+            </p>
+          </div>
+
+          {/* Filter Tabs */}
+          <div className="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold self-start sm:self-auto">
             <button
-              key={tab}
-              onClick={() => setFilterTab(tab)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                filterTab === tab
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={() => setFilterTab("ACTIVE")}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                filterTab === "ACTIVE"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              {tab === "ACTIVE"
-                ? `Active Listings (${activeCount})`
-                : tab === "SOLD"
-                ? `Sold (${soldCount})`
-                : `All Items (${products.length})`}
+              Active ({activeCount})
             </button>
-          ))}
+            <button
+              onClick={() => setFilterTab("SOLD")}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                filterTab === "SOLD"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              Sold ({soldCount})
+            </button>
+            <button
+              onClick={() => setFilterTab("ALL")}
+              className={`px-3 py-1.5 rounded-lg transition-colors ${
+                filterTab === "ALL"
+                  ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                  : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              All ({products.length})
+            </button>
+          </div>
         </div>
 
-        {/* Listings List / Table */}
+        {/* Listings Grid */}
         {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="h-24 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse"
+                className="h-44 rounded-2xl bg-slate-100 dark:bg-slate-800/60 animate-pulse border border-slate-200/60 dark:border-slate-800"
               />
             ))}
           </div>
         ) : displayedListings.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 p-12 text-center space-y-3">
-            <Package className="w-10 h-10 text-slate-400 mx-auto" />
+          <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+            <AlertCircle className="w-10 h-10 text-slate-400 mx-auto" />
             <h3 className="font-bold text-base text-slate-900 dark:text-white">
               No listings in this tab
             </h3>
@@ -263,25 +359,25 @@ export default function SellerDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {displayedListings.map((prod) => (
               <div
                 key={prod.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                className="flex flex-col justify-between p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-4"
               >
-                <div className="flex items-center gap-3.5 min-w-0">
+                <div className="flex items-start gap-3.5 min-w-0">
                   <img
-                    src={prod.imageUrls[0]}
+                    src={prod.imageUrls?.[0] || "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800"}
                     alt={prod.title}
-                    className="w-16 h-16 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0"
+                    className="w-16 h-16 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200/60 dark:border-slate-800"
                   />
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={prod.title}>
                         {prod.title}
                       </h4>
                       <span
-                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase shrink-0 ${
                           prod.status === "SOLD"
                             ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400"
                             : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
@@ -293,56 +389,234 @@ export default function SellerDashboardPage() {
                     <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                       {formatPrice(prod.price)}
                     </p>
-                    <p className="text-[11px] text-slate-400 flex items-center gap-3">
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1.5 flex-wrap">
                       <span>{prod.location}</span>
                       <span>•</span>
-                      <span>{prod.views} views</span>
+                      <span>{prod.views || 0} views</span>
                       <span>•</span>
-                      <span>{prod.likes} saves</span>
+                      <span>{prod.likes || 0} saves</span>
                     </p>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 text-xs font-semibold">
-                  <Link
-                    href={`/product/${prod.id}`}
-                    target="_blank"
-                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
-                    title="View live page"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </Link>
-
-                  {prod.status === "ACTIVE" ? (
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 gap-2 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => handleMarkAsSold(prod.id)}
-                      className="px-3 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100"
+                      onClick={() => handleOpenEdit(prod)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold transition-colors"
+                      title="Edit item details"
                     >
-                      Mark as Sold
+                      <Edit className="w-3.5 h-3.5 text-secondary" />
+                      <span>Edit</span>
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => handleMarkAsActive(prod.id)}
-                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-                    >
-                      Mark as Active
-                    </button>
-                  )}
 
-                  <button
-                    onClick={() => handleDeleteListing(prod.id)}
-                    className="p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500"
-                    title="Delete ad"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <Link
+                      href={`/product/${prod.id}`}
+                      target="_blank"
+                      className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                      title="View live page"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {prod.status === "ACTIVE" ? (
+                      <button
+                        onClick={() => handleMarkAsSold(prod.id)}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors text-xs font-bold"
+                      >
+                        Mark as Sold
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleMarkAsActive(prod.id)}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors text-xs font-bold"
+                      >
+                        Mark as Active
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleDeleteListing(prod.id)}
+                      className="p-1.5 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 transition-colors"
+                      title="Delete ad"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+                  <Edit className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                    Edit Item Details
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Changes will save permanently across the marketplace
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingProduct(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Title */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Item Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.title}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
+                  placeholder="e.g. Scientific Calculator"
+                />
+              </div>
+
+              {/* Price & Condition */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Price (KSh)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={editForm.price}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Condition
+                  </label>
+                  <select
+                    value={editForm.condition}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        condition: e.target.value as Product["condition"],
+                      }))
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
+                  >
+                    <option value="SECOND_HAND">Second Hand</option>
+                    <option value="NEW">Brand New</option>
+                    <option value="BUSINESS">Business</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Category & Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Category
+                  </label>
+                  <select
+                    value={editForm.categoryId}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, categoryId: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
+                  >
+                    {SAMPLE_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Campus Zone / Location
+                  </label>
+                  <select
+                    value={editForm.location}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, location: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
+                  >
+                    {UNIVERSITY_LOCATIONS.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Item Description
+                </label>
+                <textarea
+                  rows={4}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 leading-relaxed resize-none"
+                  placeholder="Describe condition, battery health, accessories included..."
+                />
+              </div>
+
+              {/* Form Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  disabled={savingEdit}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+                >
+                  {savingEdit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Saving Permanently...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
