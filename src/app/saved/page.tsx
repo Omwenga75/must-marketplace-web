@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Product } from "@/types";
 import { fetchProducts } from "@/lib/firebase/services";
+import { database } from "@/lib/firebase/config";
+import { ref, onValue } from "firebase/database";
 import { useFavorites } from "@/context/FavoritesContext";
 import ProductGrid from "@/components/products/ProductGrid";
 
@@ -20,6 +22,29 @@ export default function SavedItemsPage() {
       .catch(() => {
         setLoading(false);
       });
+
+    // Real-time listener for updates and status changes
+    let unsubDb: (() => void) | null = null;
+    if (database) {
+      try {
+        const prodsRef = ref(database, "products");
+        unsubDb = onValue(prodsRef, (snapshot) => {
+          const val = snapshot.val();
+          if (val && typeof val === "object") {
+            const list: Product[] = Object.entries(val).map(([k, v]: [string, any]) => ({
+              ...v,
+              id: v.id || k,
+              likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
+              views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
+            }));
+            setAllProducts(list);
+            setLoading(false);
+          }
+        });
+      } catch (e) {
+        console.warn("Saved page RTDB error:", e);
+      }
+    }
 
     const handleProductDeletedEvent = (pid: string) => {
       if (pid) setAllProducts((prev) => prev.filter((p) => p.id !== pid));
@@ -54,13 +79,16 @@ export default function SavedItemsPage() {
     window.addEventListener("storage", onStorage);
 
     return () => {
+      if (unsubDb) unsubDb();
       window.removeEventListener("must_product_deleted", onProductDeleted);
       window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
     };
   }, []);
 
-  const savedProducts = allProducts.filter((p) => favoriteIds.has(p.id));
+  const savedProducts = allProducts.filter(
+    (p) => favoriteIds.has(p.id) && (p.status || "ACTIVE").toUpperCase() !== "SOLD"
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 sm:pt-3 pb-6 sm:pb-10 space-y-4 sm:space-y-5">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
   ShoppingBag,
@@ -131,16 +131,25 @@ export default function HomePage() {
     };
   }, []);
 
-  // Deterministic sorting: Recent by createdAt, Featured by views/popularity
-  const sortedByRecent = [...products].sort((a, b) => {
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
-    return timeB - timeA;
-  });
+  // Filter out sold items from user-facing homepage
+  const activeProducts = useMemo(() => {
+    return products.filter((p) => (p.status || "ACTIVE").toUpperCase() !== "SOLD");
+  }, [products]);
 
-  const sortedByPopular = [...products].sort((a, b) => {
-    return (b.views || 0) + (b.likes || 0) - ((a.views || 0) + (a.likes || 0));
-  });
+  // Deterministic sorting: Recent by createdAt, Featured by views/popularity
+  const sortedByRecent = useMemo(() => {
+    return [...activeProducts].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [activeProducts]);
+
+  const sortedByPopular = useMemo(() => {
+    return [...activeProducts].sort((a, b) => {
+      return (b.views || 0) + (b.likes || 0) - ((a.views || 0) + (a.likes || 0));
+    });
+  }, [activeProducts]);
 
   // Featured = top items with real engagement (at least 1 view or like), fallback to newest
   const engagedProducts = sortedByPopular.filter(p => ((p.views || 0) + (p.likes || 0)) > 0);
@@ -150,7 +159,7 @@ export default function HomePage() {
   const recentProducts = sortedByRecent.slice(0, 4);
 
   const getCategoryCount = (catId: string) => {
-    return products.filter((p) => p.category?.id === catId).length;
+    return activeProducts.filter((p) => p.category?.id === catId).length;
   };
 
   return (

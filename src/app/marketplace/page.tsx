@@ -136,6 +136,10 @@ function MarketplaceContent() {
   const filteredProducts = useMemo(() => {
     return products
       .filter((product) => {
+        // Exclude sold items from public marketplace browsing
+        const status = (product.status || "ACTIVE").toUpperCase();
+        if (status === "SOLD") return false;
+
         // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();

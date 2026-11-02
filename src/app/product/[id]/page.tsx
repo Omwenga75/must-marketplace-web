@@ -390,26 +390,47 @@ export default function ProductDetailPage() {
 
           {/* Actions */}
           <div className="space-y-3 pt-2">
-            <button
-              onClick={handleChatWithSeller}
-              className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
-            >
-              <MessageCircle className="w-5 h-5" />
-              <span>Chat with Seller Now</span>
-            </button>
+            {product.status === "SOLD" ? (
+              <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center space-y-1">
+                <p className="text-rose-700 dark:text-rose-400 font-extrabold text-sm uppercase tracking-wide">
+                  Item Sold
+                </p>
+                <p className="text-xs text-rose-600/90 dark:text-rose-300">
+                  This listing is no longer available. Explore active items on the marketplace.
+                </p>
+                <div className="pt-2">
+                  <Link
+                    href="/marketplace"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs shadow-sm hover:opacity-90 transition-opacity"
+                  >
+                    <span>Browse Active Listings</span>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={handleChatWithSeller}
+                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Chat with Seller Now</span>
+                </button>
 
-            {product.sellerPhone && (
-              <a
-                href={`https://wa.me/${product.sellerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                  `Hi ${product.sellerName}, I saw your listing for "${product.title}" on MUST Marketplace.`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Phone className="w-4 h-4 text-emerald-600" />
-                <span>WhatsApp Seller ({product.sellerPhone})</span>
-              </a>
+                {product.sellerPhone && (
+                  <a
+                    href={`https://wa.me/${product.sellerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
+                      `Hi ${product.sellerName}, I saw your listing for "${product.title}" on MUST Marketplace.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Phone className="w-4 h-4 text-emerald-600" />
+                    <span>WhatsApp Seller ({product.sellerPhone})</span>
+                  </a>
+                )}
+              </>
             )}
           </div>
 
