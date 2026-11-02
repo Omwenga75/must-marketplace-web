@@ -206,10 +206,10 @@ export default function HomePage() {
               <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-200/80 dark:border-slate-800 text-left">
                 <div className="space-y-0.5">
                   <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
-                    120+
+                    {loading ? "..." : activeProducts.length}
                   </p>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Items Listed
+                    {activeProducts.length === 1 ? "Item Listed" : "Items Listed"}
                   </p>
                 </div>
                 <div className="space-y-0.5">
