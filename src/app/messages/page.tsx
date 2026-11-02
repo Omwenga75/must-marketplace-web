@@ -11,6 +11,16 @@ import {
   CheckCheck,
   ShoppingBag,
   ExternalLink,
+  Paperclip,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Smile,
+  X,
+  Download,
+  AlertCircle,
+  Ban,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Conversation, Message } from "@/types";
@@ -19,11 +29,17 @@ import {
   subscribeToConversations,
   subscribeToMessages,
   sendMessage,
+  editMessage,
+  deleteMessage,
+  toggleMessageReaction,
+  deleteConversation,
+  clearConversationMessages,
   markConversationAsRead,
   subscribeToTyping,
   setTypingStatus,
   deduplicateConversations,
   resolveRealUserName,
+  uploadProductImage,
 } from "@/lib/firebase/services";
 import { formatRelativeTime, formatMessageTime, isAdministratorEmail } from "@/lib/utils";
 import { resolveCanonicalId } from "@/lib/userCanonical";
@@ -127,24 +143,61 @@ function MessagesContent() {
   const [sendingDirect, setSendingDirect] = useState(false);
   const [searchFilter, setSearchFilter] = useState("");
 
+  // WhatsApp-like interactive states
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [reactionMsgId, setReactionMsgId] = useState<string | null>(null);
+  const [menuMsgId, setMenuMsgId] = useState<string | null>(null);
+  const [showConvMenu, setShowConvMenu] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  const [convActionConfirm, setConvActionConfirm] = useState<{
+    type: "clear" | "delete";
+    conversationId: string;
+    userName: string;
+  } | null>(null);
+
+  // Media / image attachment states
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Image lightbox modal
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+
   // Ref to chat message scroll container (avoids scrollIntoView to prevent page jump)
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const EMOJI_OPTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
 
   // Keep window scrolled to top on mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
+  // Dismiss popups when clicking anywhere outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-popup='true']")) {
+        setMenuMsgId(null);
+        setReactionMsgId(null);
+        setShowConvMenu(false);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Redirect unauthenticated users to login
   useEffect(() => {
     if (!authLoading && !user) {
       const params = new URLSearchParams();
-      if (sellerIdQuery) params.set('sellerId', sellerIdQuery);
-      if (sellerNameQuery) params.set('sellerName', sellerNameQuery);
-      if (productIdQuery) params.set('productId', productIdQuery);
-      if (productTitleQuery) params.set('productTitle', productTitleQuery);
-      const msgRedirect = params.toString() ? '/messages?' + params.toString() : '/messages';
-      router.replace('/login?redirect=' + encodeURIComponent(msgRedirect));
+      if (sellerIdQuery) params.set("sellerId", sellerIdQuery);
+      if (sellerNameQuery) params.set("sellerName", sellerNameQuery);
+      if (productIdQuery) params.set("productId", productIdQuery);
+      if (productTitleQuery) params.set("productTitle", productTitleQuery);
+      const msgRedirect = params.toString() ? "/messages?" + params.toString() : "/messages";
+      router.replace("/login?redirect=" + encodeURIComponent(msgRedirect));
     }
   }, [authLoading, user, sellerIdQuery, sellerNameQuery, productIdQuery, productTitleQuery]);
 
@@ -163,7 +216,6 @@ function MessagesContent() {
   useEffect(() => {
     if (typeof window === "undefined" || !user?.id) return;
     try {
-      // Purge any stale alias keys or demo chat messages
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
         if (
@@ -203,6 +255,9 @@ function MessagesContent() {
   const openConversation = (conv: Conversation) => {
     const zeroed = { ...conv, unreadCount: 0 };
     setActiveConversation(zeroed);
+    setEditingMessage(null);
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
     if (user?.id) {
       markConversationAsRead(user.id, conv.id);
       setConversations((prev) =>
@@ -237,7 +292,6 @@ function MessagesContent() {
 
       // Handle query param target conversation from product page
       if (sellerIdQuery) {
-        // Prevent chatting with oneself
         const isSelf =
           sellerIdQuery === user.id ||
           (user.email && sellerIdQuery.toLowerCase() === user.email.toLowerCase()) ||
@@ -282,7 +336,6 @@ function MessagesContent() {
           };
           setActiveConversation(newTarget);
 
-          // If query param didn't provide a real name, resolve it asynchronously
           if (!validQueryName) {
             resolveRealUserName(sellerIdQuery).then((realName) => {
               if (realName && !realName.toLowerCase().includes("comrade")) {
@@ -323,7 +376,6 @@ function MessagesContent() {
     const unsubMessages = subscribeToMessages(activeConversation.id, (msgs) => {
       setMessages(msgs);
       setMessagesLoaded(true);
-      // Only scroll to bottom if already near the bottom (don't jump on background updates)
       const el = chatScrollContainerRef.current;
       if (!el) {
         setTimeout(() => scrollChatToBottom(false), 30);
@@ -333,7 +385,6 @@ function MessagesContent() {
       }
     });
 
-    // Fallback: Ensure skeleton clears if messages callback is delayed
     const fallbackTimer = setTimeout(() => {
       setMessagesLoaded(true);
     }, 800);
@@ -382,18 +433,158 @@ function MessagesContent() {
     setTimeout(() => scrollChatToBottom(false), 40);
   }, [activeConversation?.id]);
 
-  // ─── Actions ────────────────────────────────────────────────────────────────
+  // ─── WhatsApp Actions ────────────────────────────────────────────────────────
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image must be smaller than 10MB");
+      return;
+    }
+    setSelectedImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setSelectedImagePreview(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
+  };
+
+  const handleReaction = async (msg: Message, emoji: string) => {
+    if (!user || !activeConversation) return;
+    try {
+      await toggleMessageReaction(activeConversation.id, msg.id, user.id, emoji);
+      setReactionMsgId(null);
+      setMenuMsgId(null);
+    } catch (err) {
+      console.error("Failed to toggle reaction:", err);
+    }
+  };
+
+  const handleStartEdit = (msg: Message) => {
+    setEditingMessage(msg);
+    setNewMessageText(msg.content);
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
+    setMenuMsgId(null);
+    setReactionMsgId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setNewMessageText("");
+  };
+
+  const handleDeleteMessageConfirm = async () => {
+    if (!activeConversation || !messageToDelete) return;
+    try {
+      await deleteMessage(activeConversation.id, messageToDelete.id);
+      setMessageToDelete(null);
+      setMenuMsgId(null);
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+    }
+  };
+
+  const handleClearChatConfirm = async () => {
+    if (!activeConversation) return;
+    try {
+      await clearConversationMessages(activeConversation.id);
+      setMessages([]);
+      setConvActionConfirm(null);
+      setShowConvMenu(false);
+    } catch (err) {
+      console.error("Failed to clear chat:", err);
+    }
+  };
+
+  const handleDeleteConversationConfirm = async () => {
+    if (!user || !convActionConfirm) return;
+    try {
+      const targetId = convActionConfirm.conversationId;
+      await deleteConversation(user.id, targetId);
+      setConversations((prev) => prev.filter((c) => c.id !== targetId));
+      if (activeConversation?.id === targetId) {
+        setActiveConversation(null);
+      }
+      setConvActionConfirm(null);
+      setShowConvMenu(false);
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+    }
+  };
+
+  // Right click on empty conversation area closes conversation
+  const handleChatAreaContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const isInteractive = target.closest(
+      "button, a, input, textarea, img, .message-bubble, .reaction-bar, [data-interactive='true']"
+    );
+    if (!isInteractive) {
+      e.preventDefault();
+      setActiveConversation(null);
+      setMenuMsgId(null);
+      setReactionMsgId(null);
+      setEditingMessage(null);
+    }
+  };
+
+  // Send new message or save edited message
   const handleSendDirectMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newMessageText.trim() || !user || !activeConversation || sendingDirect) return;
+    if (!user || !activeConversation) return;
+
+    // 1. If currently editing an existing message
+    if (editingMessage) {
+      const newText = newMessageText.trim();
+      if (!newText) return;
+      try {
+        await editMessage(activeConversation.id, editingMessage.id, newText);
+        setEditingMessage(null);
+        setNewMessageText("");
+      } catch (err) {
+        console.error("Failed to edit message:", err);
+      }
+      return;
+    }
+
+    // 2. If sending a new message (text and/or image)
+    if (!newMessageText.trim() && !selectedImageFile) return;
+    if (sendingDirect || uploadingImage) return;
+
     if (activeConversation.otherUserId === user.id) {
       console.warn("Cannot send message to oneself");
       return;
     }
 
     const content = newMessageText.trim();
+    const fileToUpload = selectedImageFile;
+
     setNewMessageText("");
+    setSelectedImageFile(null);
+    setSelectedImagePreview(null);
     setSendingDirect(true);
+
+    let imageUrl: string | null = null;
+    if (fileToUpload) {
+      setUploadingImage(true);
+      try {
+        imageUrl = await uploadProductImage(fileToUpload);
+      } catch (err) {
+        console.warn("Failed to upload chat image:", err);
+      } finally {
+        setUploadingImage(false);
+      }
+    }
 
     try {
       await sendMessage({
@@ -402,6 +593,7 @@ function MessagesContent() {
         receiverName: activeConversation.otherUserName,
         senderName: user.fullName || "MUST Student",
         content,
+        imageUrl,
         productId: activeConversation.productId || undefined,
         productTitle: activeConversation.productTitle || undefined,
       });
@@ -430,7 +622,7 @@ function MessagesContent() {
   }
 
   return (
-    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex">
+    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex select-none">
       {/* ── LEFT SIDEBAR: Direct Conversations ───────────────────────────────── */}
       <aside
         className={`w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900 ${
@@ -459,7 +651,6 @@ function MessagesContent() {
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto flex flex-col">
           {!conversationsLoaded ? (
-            /* Shimmer Skeletons (matching mobile app ConversationItemSkeleton) */
             <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {Array.from({ length: 6 }).map((_, i) => (
                 <ConversationItemSkeleton key={i} />
@@ -486,14 +677,14 @@ function MessagesContent() {
                 const initial = (conv.otherUserName || "U").charAt(0).toUpperCase();
 
                 return (
-                  <button
+                  <div
                     key={conv.id}
-                    onClick={() => openConversation(conv)}
-                    className={`w-full p-3.5 flex items-center gap-3 text-left transition-colors ${
+                    className={`group relative w-full p-3.5 flex items-center gap-3 transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-l-4 border-emerald-600"
                         : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     }`}
+                    onClick={() => openConversation(conv)}
                   >
                     {/* Avatar */}
                     <div className="w-11 h-11 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-sm shrink-0 shadow-xs">
@@ -514,14 +705,32 @@ function MessagesContent() {
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate pr-2">
                           {conv.lastMessage || "Click to open chat"}
                         </p>
-                        {conv.unreadCount > 0 && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shrink-0">
-                            {conv.unreadCount}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {conv.unreadCount > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                              {conv.unreadCount}
+                            </span>
+                          )}
+                          {/* WhatsApp-style delete conversation button on hover */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConvActionConfirm({
+                                type: "delete",
+                                conversationId: conv.id,
+                                userName: conv.otherUserName,
+                              });
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                            title="Delete chat"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -548,7 +757,7 @@ function MessagesContent() {
       <main className="flex-1 flex flex-col h-full bg-white dark:bg-slate-950 min-w-0 overflow-hidden">
         {activeConversation ? (
           <>
-            {/* Direct Chat Top Bar */}
+            {/* Direct Chat Top Bar (NO CALL BUTTONS as requested) */}
             <div className="h-16 px-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <button
@@ -572,9 +781,68 @@ function MessagesContent() {
                   </p>
                 </div>
               </div>
+
+              {/* Chat Options Dropdown Menu (3-dots) */}
+              <div className="relative" data-popup="true">
+                <button
+                  type="button"
+                  onClick={() => setShowConvMenu(!showConvMenu)}
+                  className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  title="Chat options"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+
+                {showConvMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-1.5 z-40 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConvActionConfirm({
+                          type: "clear",
+                          conversationId: activeConversation.id,
+                          userName: activeConversation.otherUserName,
+                        });
+                        setShowConvMenu(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                    >
+                      <Trash2 className="w-4 h-4 text-amber-500" />
+                      <span>Clear messages</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConvActionConfirm({
+                          type: "delete",
+                          conversationId: activeConversation.id,
+                          userName: activeConversation.otherUserName,
+                        });
+                        setShowConvMenu(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
+                    >
+                      <Ban className="w-4 h-4" />
+                      <span>Delete conversation</span>
+                    </button>
+                    <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveConversation(null);
+                        setShowConvMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left flex items-center gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Close chat</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Product Context Banner (like mobile app's ProductInquiryHeader) */}
+            {/* Product Context Banner */}
             {activeConversation.productTitle && (
               <div className="px-4 py-2 bg-emerald-50/80 dark:bg-emerald-950/40 border-b border-emerald-100 dark:border-emerald-900/60 flex items-center justify-between text-xs shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
@@ -595,13 +863,14 @@ function MessagesContent() {
               </div>
             )}
 
-            {/* Messages Container (Pure Direct Chats Only) */}
+            {/* Messages Container (Right-click on empty area closes conversation) */}
             <div
               ref={chatScrollContainerRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/50 flex flex-col"
+              onContextMenu={handleChatAreaContextMenu}
+              title="Tip: Right-click empty area to close chat"
+              className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-950/50 flex flex-col select-text"
             >
               {!messagesLoaded ? (
-                /* Shimmer Skeletons for Chat Bubbles (matching ChatBubbleSkeletonRow) */
                 <div className="flex-1 flex flex-col justify-end space-y-4 py-4">
                   <ChatBubbleSkeleton isMine={false} />
                   <ChatBubbleSkeleton isMine={true} />
@@ -617,7 +886,7 @@ function MessagesContent() {
                     No messages yet
                   </p>
                   <p className="text-xs text-slate-400 max-w-xs mt-1">
-                    Send a message to start chatting with {activeConversation.otherUserName || "this seller"}.
+                    Send a message to start chatting with {activeConversation.otherUserName || "this student"}.
                   </p>
                 </div>
               ) : (
@@ -625,24 +894,189 @@ function MessagesContent() {
                   const myCanon = resolveCanonicalId(user?.id || "");
                   const senderCanon = resolveCanonicalId(msg.senderId || "");
                   const isMe = Boolean(myCanon && (myCanon === senderCanon || msg.senderId === user?.id));
+                  const isDeleted = Boolean(msg.isDeleted);
+                  const reactionsMap = msg.reactions || (msg.reaction ? { default: msg.reaction } : {});
+                  const reactionEntries = Object.entries(reactionsMap);
+                  const isMenuOpen = menuMsgId === msg.id;
+                  const isReactionPickerOpen = reactionMsgId === msg.id;
 
                   return (
                     <div
                       key={msg.id}
-                      className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                      className={`group relative flex flex-col ${isMe ? "items-end" : "items-start"} my-1`}
                     >
+                      {/* WhatsApp-style Hover Action Bar (Reaction button, Heart, 3-dots) */}
+                      {!isDeleted && (
+                        <div
+                          data-popup="true"
+                          className={`absolute top-0 -translate-y-1/2 ${
+                            isMe ? "right-2" : "left-2"
+                          } z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md rounded-full px-1.5 py-0.5 flex items-center gap-0.5`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReactionMsgId(reactionMsgId === msg.id ? null : msg.id);
+                              setMenuMsgId(null);
+                            }}
+                            className="p-1 text-slate-400 hover:text-amber-500 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            title="React"
+                          >
+                            <Smile className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleReaction(msg, "❤️")}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            title="Like with ❤️"
+                          >
+                            <span className="text-xs leading-none">❤️</span>
+                          </button>
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuMsgId(menuMsgId === msg.id ? null : msg.id);
+                                setReactionMsgId(null);
+                              }}
+                              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                              title="More options"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+
+                            {isMenuOpen && (
+                              <div
+                                className={`absolute top-full mt-1 ${
+                                  isMe ? "right-0" : "left-0"
+                                } w-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl py-1 z-30 text-xs`}
+                              >
+                                {isMe && !msg.imageUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(msg)}
+                                    className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 text-blue-500" />
+                                    <span>Edit text</span>
+                                  </button>
+                                )}
+                                {isMe && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setMessageToDelete(msg);
+                                      setMenuMsgId(null);
+                                    }}
+                                    className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (navigator.clipboard) {
+                                      navigator.clipboard.writeText(msg.content || "");
+                                    }
+                                    setMenuMsgId(null);
+                                  }}
+                                  className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                                >
+                                  <span>Copy text</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick Reaction Popup Picker */}
+                      {isReactionPickerOpen && (
+                        <div
+                          data-popup="true"
+                          className={`absolute top-0 -translate-y-full ${
+                            isMe ? "right-0" : "left-0"
+                          } mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full shadow-xl px-2 py-1.5 flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150`}
+                        >
+                          {EMOJI_OPTIONS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReaction(msg, emoji)}
+                              className="text-base sm:text-lg hover:scale-125 transition-transform p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Bubble Content */}
                       <div
-                        className={`max-w-[85%] sm:max-w-md px-4 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
+                        className={`message-bubble relative max-w-[85%] sm:max-w-md rounded-2xl text-xs sm:text-sm leading-relaxed shadow-xs ${
                           isMe
                             ? "bg-emerald-600 text-white rounded-br-xs"
                             : "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700/80 rounded-bl-xs"
-                        }`}
+                        } ${isDeleted ? "opacity-75 italic" : ""}`}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        {/* Image attachment in bubble */}
+                        {msg.imageUrl && !isDeleted && (
+                          <div className="p-1">
+                            <img
+                              src={msg.imageUrl}
+                              alt="Attached photo"
+                              onClick={() => setLightboxImageUrl(msg.imageUrl || null)}
+                              className="rounded-xl max-h-72 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                            />
+                          </div>
+                        )}
+
+                        {/* Text message content */}
+                        {msg.content && (
+                          <div className="px-4 py-2.5">
+                            {isDeleted ? (
+                              <span className="flex items-center gap-1.5 text-slate-300 dark:text-slate-400">
+                                <Ban className="w-3.5 h-3.5" />
+                                <span>This message was deleted</span>
+                              </span>
+                            ) : (
+                              <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* WhatsApp-style floating reaction badge docked on bottom edge */}
+                        {reactionEntries.length > 0 && !isDeleted && (
+                          <div
+                            onClick={() => handleReaction(msg, reactionEntries[0][1])}
+                            className={`absolute -bottom-2.5 ${
+                              isMe ? "left-2" : "right-2"
+                            } bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-1.5 py-0.5 text-xs shadow-sm flex items-center gap-0.5 cursor-pointer hover:scale-105 transition-transform`}
+                            title="Reaction (click to toggle)"
+                          >
+                            <span>{reactionEntries[0][1]}</span>
+                            {reactionEntries.length > 1 && (
+                              <span className="text-[10px] text-slate-500 font-bold">
+                                {reactionEntries.length}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 px-1">
+
+                      {/* Bubble Timestamp and Status Footer */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 px-1">
                         <span>{formatMessageTime(msg.timestamp)}</span>
-                        {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />}
+                        {msg.isEdited && !isDeleted && (
+                          <span className="text-[9px] italic text-slate-400 font-medium">(edited)</span>
+                        )}
+                        {isMe && !isDeleted && (
+                          <CheckCheck className={`w-3.5 h-3.5 ${msg.isRead ? "text-emerald-400" : "text-slate-400"}`} />
+                        )}
                       </div>
                     </div>
                   );
@@ -660,32 +1094,107 @@ function MessagesContent() {
               )}
             </div>
 
-            {/* Chat Composer */}
-            <form
-              onSubmit={handleSendDirectMessage}
-              className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0"
-            >
-              <input
-                type="text"
-                placeholder="Type a message..."
-                value={newMessageText}
-                onChange={(e) => {
-                  setNewMessageText(e.target.value);
-                  if (activeConversation && user) {
-                    setTypingStatus(activeConversation.id, user.id, e.target.value.length > 0);
-                  }
-                }}
-                className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              />
+            {/* ── Chat Composer ──────────────────────────────────────────────── */}
+            <div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
+              {/* Image Preview Banner if an image is selected */}
+              {selectedImagePreview && (
+                <div className="px-4 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xs">
+                      <img
+                        src={selectedImagePreview}
+                        alt="Selected attachment"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-slate-800 dark:text-slate-200">Image attached</p>
+                      <p className="text-[10px] text-slate-400">Add a caption or send directly</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveSelectedImage}
+                    className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
-              <button
-                type="submit"
-                disabled={sendingDirect || !newMessageText.trim()}
-                className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center transition-all shrink-0 shadow-xs"
+              {/* Editing Banner if editing an existing message */}
+              {editingMessage && (
+                <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Pencil className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                    <span className="truncate">
+                      Editing message: <strong className="italic">"{editingMessage.content}"</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="p-1 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 transition-colors"
+                    title="Cancel edit"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <form
+                onSubmit={handleSendDirectMessage}
+                className="p-3 flex items-center gap-2"
               >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+                {/* Media Attachment Paperclip Button */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sendingDirect || uploadingImage || Boolean(editingMessage)}
+                  className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+                  title="Send photo"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+
+                <input
+                  type="text"
+                  placeholder={editingMessage ? "Edit message..." : "Type a message..."}
+                  value={newMessageText}
+                  onChange={(e) => {
+                    setNewMessageText(e.target.value);
+                    if (activeConversation && user && !editingMessage) {
+                      setTypingStatus(activeConversation.id, user.id, e.target.value.length > 0);
+                    }
+                  }}
+                  className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+
+                <button
+                  type="submit"
+                  disabled={
+                    sendingDirect ||
+                    uploadingImage ||
+                    (!newMessageText.trim() && !selectedImageFile)
+                  }
+                  className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center transition-all shrink-0 shadow-xs"
+                  title={editingMessage ? "Save edit" : "Send message"}
+                >
+                  {uploadingImage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </form>
+            </div>
           </>
         ) : (
           /* ── EMPTY STATE: No Conversation Selected (Desktop) ─────────────── */
@@ -697,11 +1206,130 @@ function MessagesContent() {
               Select a conversation to start chatting
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
-              Choose a buyer or seller from the left to view messages and make deals.
+              Choose a buyer or seller from the left to view messages, send photos, and make campus deals.
             </p>
           </div>
         )}
       </main>
+
+      {/* ── MODAL: Delete Message Confirmation ──────────────────────────────── */}
+      {messageToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Message?</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                This message will be deleted for everyone in this chat.
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setMessageToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteMessageConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-colors"
+              >
+                Delete for everyone
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Clear / Delete Conversation Confirmation ─────────────────── */}
+      {convActionConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ${
+                convActionConfirm.type === "clear"
+                  ? "bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400"
+                  : "bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400"
+              }`}
+            >
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {convActionConfirm.type === "clear" ? "Clear Chat History?" : "Delete Conversation?"}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {convActionConfirm.type === "clear"
+                  ? `Are you sure you want to delete all messages with ${convActionConfirm.userName}?`
+                  : `Are you sure you want to remove the conversation with ${convActionConfirm.userName}?`}
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setConvActionConfirm(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={
+                  convActionConfirm.type === "clear"
+                    ? handleClearChatConfirm
+                    : handleDeleteConversationConfirm
+                }
+                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold shadow-sm transition-colors ${
+                  convActionConfirm.type === "clear"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
+              >
+                {convActionConfirm.type === "clear" ? "Clear Messages" : "Delete Chat"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Full Screen Image Lightbox ────────────────────────────────── */}
+      {lightboxImageUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4"
+          onClick={() => setLightboxImageUrl(null)}
+        >
+          <div className="absolute top-4 right-4 flex items-center gap-3 z-50">
+            <a
+              href={lightboxImageUrl}
+              download="chat-photo.jpg"
+              onClick={(e) => e.stopPropagation()}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="Download photo"
+            >
+              <Download className="w-5 h-5" />
+            </a>
+            <button
+              type="button"
+              onClick={() => setLightboxImageUrl(null)}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <img
+            src={lightboxImageUrl}
+            alt="Enlarged chat attachment"
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-[90vw] max-h-[85vh] rounded-2xl object-contain shadow-2xl"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -63,6 +63,11 @@ export interface Message {
   audioUrl?: string | null;
   timestamp: string;
   isRead: boolean;
+  reactions?: Record<string, string>;
+  reaction?: string | null;
+  isEdited?: boolean;
+  editedAt?: string | null;
+  isDeleted?: boolean;
 }
 
 export interface Conversation {

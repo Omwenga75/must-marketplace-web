@@ -1360,7 +1360,12 @@ export function subscribeToMessages(
       }
     }
 
-    const fingerprint = cleanList.map((m) => `${m.id}_${m.timestamp}`).join(",");
+    const fingerprint = cleanList
+      .map(
+        (m) =>
+          `${m.id}_${m.timestamp}_${m.content}_${m.reaction || ""}_${Boolean(m.isEdited)}_${Boolean(m.isDeleted)}_${Object.keys(m.reactions || {}).length}`
+      )
+      .join(",");
     if (lastMsgFingerprint !== null && fingerprint === lastMsgFingerprint) return; // no change
     lastMsgFingerprint = fingerprint;
     saveLocalMessages(conversationId, cleanList);
@@ -1392,7 +1397,16 @@ export function subscribeToMessages(
 
   // Listen to real-time events across tabs
   const unsubLocal = listenToChatSync((payload) => {
-    if (payload?.conversationId === conversationId || payload?.type === "storage_change") {
+    if (
+      payload?.conversationId === conversationId ||
+      payload?.type === "storage_change" ||
+      payload?.type === "message_edit" ||
+      payload?.type === "message_delete" ||
+      payload?.type === "message_reaction" ||
+      payload?.type === "messages_cleared"
+    ) {
+      const local = getLocalMessages(conversationId);
+      dedupeAndEmit(local);
       fetchFromServer();
     }
   });
@@ -1579,6 +1593,236 @@ export async function sendMessage(params: {
       await set(ref(database, `messages/${conversationId}/${msgId}`), message);
       await set(ref(database, `conversations/${senderId}/${conversationId}`), updatedSenderConv);
       await set(ref(database, `conversations/${receiverId}/${conversationId}`), updatedReceiverConv);
+    } catch {}
+  }
+}
+
+export async function editMessage(
+  conversationId: string,
+  messageId: string,
+  newContent: string
+): Promise<void> {
+  const clean = newContent.trim();
+  if (!clean) return;
+
+  // 1. Update local storage immediately (0ms instant UI feedback)
+  const msgs = getLocalMessages(conversationId);
+  const updated = msgs.map((m) =>
+    m.id === messageId
+      ? { ...m, content: clean, isEdited: true, editedAt: String(Date.now()) }
+      : m
+  );
+  saveLocalMessages(conversationId, updated);
+
+  // 2. Broadcast live event across tabs
+  notifyChatSync({
+    type: "message_edit",
+    conversationId,
+    messageId,
+    content: clean,
+  });
+
+  // 3. Update server API
+  if (typeof window !== "undefined") {
+    try {
+      await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          messageId,
+          action: "edit",
+          content: clean,
+        }),
+      });
+    } catch {}
+  }
+
+  // 4. Update Firebase RTDB
+  if (database) {
+    try {
+      await update(ref(database, `messages/${conversationId}/${messageId}`), {
+        content: clean,
+        isEdited: true,
+        editedAt: Date.now(),
+      });
+    } catch {}
+  }
+}
+
+export async function deleteMessage(
+  conversationId: string,
+  messageId: string
+): Promise<void> {
+  // 1. Update local storage (WhatsApp-like: marks deleted so it shows "This message was deleted")
+  const msgs = getLocalMessages(conversationId);
+  const updated = msgs.map((m) =>
+    m.id === messageId
+      ? { ...m, isDeleted: true, content: "🚫 This message was deleted" }
+      : m
+  );
+  saveLocalMessages(conversationId, updated);
+
+  // 2. Broadcast live event
+  notifyChatSync({
+    type: "message_delete",
+    conversationId,
+    messageId,
+  });
+
+  // 3. Update server API
+  if (typeof window !== "undefined") {
+    try {
+      await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          messageId,
+          action: "delete",
+        }),
+      });
+    } catch {}
+  }
+
+  // 4. Update Firebase RTDB
+  if (database) {
+    try {
+      await update(ref(database, `messages/${conversationId}/${messageId}`), {
+        isDeleted: true,
+        content: "🚫 This message was deleted",
+      });
+    } catch {}
+  }
+}
+
+export async function toggleMessageReaction(
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  emoji: string
+): Promise<void> {
+  const msgs = getLocalMessages(conversationId);
+  const target = msgs.find((m) => m.id === messageId);
+  if (!target) return;
+
+  const reactions = { ...(target.reactions || {}) };
+  if (reactions[userId] === emoji) {
+    delete reactions[userId];
+  } else {
+    reactions[userId] = emoji;
+  }
+  const primaryReaction = Object.values(reactions)[0] || null;
+
+  const updated = msgs.map((m) =>
+    m.id === messageId
+      ? { ...m, reactions, reaction: primaryReaction }
+      : m
+  );
+  saveLocalMessages(conversationId, updated);
+
+  // Broadcast
+  notifyChatSync({
+    type: "message_reaction",
+    conversationId,
+    messageId,
+    userId,
+    emoji,
+    reactions,
+  });
+
+  // Update server API
+  if (typeof window !== "undefined") {
+    try {
+      await fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          messageId,
+          userId,
+          emoji,
+          action: "react",
+        }),
+      });
+    } catch {}
+  }
+
+  // Update Firebase RTDB
+  if (database) {
+    try {
+      await set(
+        ref(database, `messages/${conversationId}/${messageId}/reactions`),
+        reactions
+      );
+    } catch {}
+  }
+}
+
+export async function deleteConversation(
+  userId: string,
+  conversationId: string
+): Promise<void> {
+  // 1. Update local storage
+  const convs = getLocalConversations(userId);
+  const remaining = convs.filter((c) => c.id !== conversationId);
+  saveLocalConversations(userId, remaining);
+  saveLocalMessages(conversationId, []);
+
+  // 2. Broadcast
+  notifyChatSync({
+    type: "conversation_delete",
+    conversationId,
+    userId,
+  });
+
+  // 3. Update server API
+  if (typeof window !== "undefined") {
+    try {
+      await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId,
+          userId,
+          action: "delete",
+        }),
+      });
+      await fetch(`/api/messages?conversationId=${encodeURIComponent(conversationId)}`, {
+        method: "DELETE",
+      });
+    } catch {}
+  }
+
+  // 4. Update Firebase RTDB
+  if (database) {
+    try {
+      await remove(ref(database, `conversations/${userId}/${conversationId}`));
+    } catch {}
+  }
+}
+
+export async function clearConversationMessages(
+  conversationId: string
+): Promise<void> {
+  saveLocalMessages(conversationId, []);
+
+  notifyChatSync({
+    type: "messages_cleared",
+    conversationId,
+  });
+
+  if (typeof window !== "undefined") {
+    try {
+      await fetch(`/api/messages?conversationId=${encodeURIComponent(conversationId)}`, {
+        method: "DELETE",
+      });
+    } catch {}
+  }
+
+  if (database) {
+    try {
+      await remove(ref(database, `messages/${conversationId}`));
     } catch {}
   }
 }

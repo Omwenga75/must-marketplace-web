@@ -266,3 +266,88 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err?.message || "Failed to send message" }, { status: 500 });
   }
 }
+
+// PATCH /api/messages — Edit, react, or soft delete message
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { conversationId, messageId, action, content, userId, emoji } = body;
+
+    if (!conversationId || !messageId) {
+      return NextResponse.json({ error: "conversationId and messageId required" }, { status: 400 });
+    }
+
+    const allMessages = ensureMessagesFile();
+    const list = allMessages[conversationId] || [];
+    const index = list.findIndex((m) => m.id === messageId);
+
+    if (index === -1) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    const targetMsg = { ...list[index] };
+
+    if (action === "edit") {
+      targetMsg.content = content || "";
+      targetMsg.isEdited = true;
+      targetMsg.editedAt = String(Date.now());
+    } else if (action === "delete") {
+      targetMsg.isDeleted = true;
+      targetMsg.content = "🚫 This message was deleted";
+    } else if (action === "react") {
+      const reactions = { ...(targetMsg.reactions || {}) };
+      if (reactions[userId] === emoji) {
+        delete reactions[userId];
+      } else {
+        reactions[userId] = emoji;
+      }
+      targetMsg.reactions = reactions;
+      targetMsg.reaction = Object.values(reactions)[0] || null;
+    }
+
+    list[index] = targetMsg;
+    allMessages[conversationId] = list;
+    saveMessagesFile(allMessages);
+
+    // If last message in thread was edited, update conversation preview
+    if (action === "edit" || action === "delete") {
+      const threads = ensureConversationsFile();
+      const thread = threads.find((t) => t.id === conversationId);
+      if (thread && index === list.length - 1) {
+        thread.lastMessage = targetMsg.content;
+        saveConversationsFile(threads);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: targetMsg });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Failed to update message" }, { status: 500 });
+  }
+}
+
+// DELETE /api/messages?conversationId=...&messageId=...
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const conversationId = searchParams.get("conversationId");
+    const messageId = searchParams.get("messageId");
+
+    if (!conversationId) {
+      return NextResponse.json({ error: "conversationId required" }, { status: 400 });
+    }
+
+    const allMessages = ensureMessagesFile();
+
+    if (messageId) {
+      const list = allMessages[conversationId] || [];
+      allMessages[conversationId] = list.filter((m) => m.id !== messageId);
+    } else {
+      allMessages[conversationId] = [];
+    }
+
+    saveMessagesFile(allMessages);
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Failed to delete messages" }, { status: 500 });
+  }
+}

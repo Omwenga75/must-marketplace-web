@@ -171,6 +171,12 @@ export async function POST(req: Request) {
     });
 
     if (threadIndex >= 0) {
+      if (action === "delete") {
+        threads.splice(threadIndex, 1);
+        saveConversationsFile(threads);
+        return NextResponse.json({ success: true, deleted: true });
+      }
+
       const thread = threads[threadIndex];
       if (action === "mark_read" && userId) {
         thread.unreadCounts[userId] = 0;
@@ -189,5 +195,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Conversation not found" }, { status: 404 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Failed to update conversation" }, { status: 500 });
+  }
+}
+
+// DELETE /api/conversations?conversationId=...
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const conversationId = searchParams.get("conversationId");
+    if (!conversationId) {
+      return NextResponse.json({ error: "conversationId required" }, { status: 400 });
+    }
+    const threads = ensureConversationsFile();
+    const updated = threads.filter((t) => t.id !== conversationId);
+    saveConversationsFile(updated);
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Failed to delete conversation" }, { status: 500 });
   }
 }
