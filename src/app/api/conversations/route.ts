@@ -6,6 +6,7 @@ import { resolveCanonicalId } from "@/lib/userCanonical";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const CONVERSATIONS_FILE = path.join(DATA_DIR, "conversations.json");
+const USERS_FILE = path.join(DATA_DIR, "users.json");
 
 interface StoredThread {
   id: string;
@@ -62,13 +63,32 @@ function matchesUser(targetId: string, thread: StoredThread): boolean {
 }
 
 function getDisplayName(userId: string, names: Record<string, string>): string {
-  if (names[userId]) return names[userId];
+  if (names[userId] && !names[userId].toLowerCase().includes("comrade")) return names[userId];
   const lower = userId.toLowerCase();
   if (lower === "eqojbqs272vjioq53fwjghyzkq1" || lower.startsWith("eqojbqs")) return "Mary Wanjiku";
   if (lower === "gk3z6c39nqyxpegjb2g0s2wg5yo2") return "James Njuguna";
   if (lower === "demo_seller_456" || lower === "u1") return "James Mutua";
   if (lower === "demo_admin_789" || lower === "system_admin") return "MUST Support Desk";
-  return "MUST Comrade";
+
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const raw = fs.readFileSync(USERS_FILE, "utf8");
+      const users = JSON.parse(raw);
+      if (Array.isArray(users)) {
+        const found = users.find(
+          (u: any) =>
+            u.id === userId ||
+            (u.email && u.email.toLowerCase() === lower) ||
+            (u.phone && u.phone.replace(/\D/g, "") === userId.replace(/\D/g, ""))
+        );
+        if (found && found.fullName && !found.fullName.toLowerCase().includes("comrade")) {
+          return found.fullName;
+        }
+      }
+    }
+  } catch {}
+
+  return "Student Seller";
 }
 
 // GET /api/conversations?userId=...

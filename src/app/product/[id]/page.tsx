@@ -15,6 +15,7 @@ import {
   Calendar,
   Check,
   AlertCircle,
+  Store,
 } from "lucide-react";
 import { Product } from "@/types";
 import { getProductById, recordProductView, getProductLikes } from "@/lib/firebase/services";
@@ -234,12 +235,22 @@ export default function ProductDetailPage() {
     }
   };
 
+  const isOwner = Boolean(
+    user &&
+    product &&
+    (
+      (product.sellerId && user.id && product.sellerId === user.id) ||
+      (product.sellerPhone && user.phone && product.sellerPhone.replace(/\D/g, "") === user.phone.replace(/\D/g, "")) ||
+      (product.sellerId && user.email && product.sellerId.toLowerCase() === user.email.toLowerCase())
+    )
+  );
+
   const handleChatWithSeller = () => {
     if (!user) {
       router.push(`/login?redirect=/product/${product.id}`);
       return;
     }
-    if (product.sellerId === user.id || (user.phone && product.sellerPhone === user.phone)) {
+    if (isOwner) {
       router.push("/seller/dashboard");
       return;
     }
@@ -423,6 +434,24 @@ export default function ProductDetailPage() {
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs shadow-sm hover:opacity-90 transition-opacity"
                   >
                     <span>Browse Active Listings</span>
+                  </Link>
+                </div>
+              </div>
+            ) : isOwner ? (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center space-y-2">
+                <div className="flex items-center justify-center gap-2 text-emerald-800 dark:text-emerald-300 font-extrabold text-sm">
+                  <Store className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Your Campus Listing</span>
+                </div>
+                <p className="text-xs text-emerald-700/90 dark:text-emerald-400">
+                  This is your own advertisement. You cannot chat with yourself.
+                </p>
+                <div className="pt-1">
+                  <Link
+                    href="/seller/dashboard"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all"
+                  >
+                    <span>Manage in Seller Dashboard</span>
                   </Link>
                 </div>
               </div>

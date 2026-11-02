@@ -1060,11 +1060,16 @@ export function deduplicateConversations(convs: Conversation[]): Conversation[] 
     if (idKey) seen.add(`id:${idKey}`);
     if (nameKey) seen.add(`name:${nameKey}`);
 
+    const cleanName =
+      c.otherUserName && !c.otherUserName.toLowerCase().includes("comrade")
+        ? c.otherUserName
+        : userNameCache.get(c.otherUserId || "") || "Student Seller";
+
     result.push({
       ...c,
       id: c.id || idKey,
       otherUserId: c.otherUserId || "",
-      otherUserName: c.otherUserName || "MUST Comrade",
+      otherUserName: cleanName,
       lastMessage: c.lastMessage || "",
       lastMessageTime: c.lastMessageTime || String(Date.now()),
       unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -1081,15 +1086,23 @@ export function getLocalConversations(userId: string): Conversation[] {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        const sanitized = parsed.map((item: any) => ({
-          ...item,
-          id: item?.id || "",
-          otherUserId: item?.otherUserId || "",
-          otherUserName: item?.otherUserName || "MUST Comrade",
-          lastMessage: item?.lastMessage || "",
-          lastMessageTime: item?.lastMessageTime || String(Date.now()),
-          unreadCount: typeof item?.unreadCount === "number" ? item.unreadCount : 0,
-        }));
+        const sanitized = parsed.map((item: any) => {
+          const rawName = item?.otherUserName;
+          const cleanName =
+            rawName && !rawName.toLowerCase().includes("comrade")
+              ? rawName
+              : userNameCache.get(item?.otherUserId || "") || "Student Seller";
+
+          return {
+            ...item,
+            id: item?.id || "",
+            otherUserId: item?.otherUserId || "",
+            otherUserName: cleanName,
+            lastMessage: item?.lastMessage || "",
+            lastMessageTime: item?.lastMessageTime || String(Date.now()),
+            unreadCount: typeof item?.unreadCount === "number" ? item.unreadCount : 0,
+          };
+        });
         return deduplicateConversations(sanitized);
       }
     }
@@ -1124,15 +1137,102 @@ export function saveLocalMessages(conversationId: string, messages: Message[]) {
   } catch {}
 }
 
+// In-memory cache for user names
+const userNameCache = new Map<string, string>();
+
+export async function resolveRealUserName(userId: string): Promise<string> {
+  if (!userId) return "Student Seller";
+  if (userNameCache.has(userId)) return userNameCache.get(userId)!;
+
+  // Check localStorage cache
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem(`must_user_name_${userId}`);
+      if (
+        cached &&
+        !cached.toLowerCase().includes("comrade") &&
+        !cached.toLowerCase().includes("must seller")
+      ) {
+        userNameCache.set(userId, cached);
+        return cached;
+      }
+    } catch {}
+  }
+
+  // 1. Check Firebase RTDB users/${userId}
+  if (database) {
+    try {
+      const snap = await get(ref(database, `users/${userId}`));
+      if (snap.exists()) {
+        const val = snap.val();
+        const name = (val?.fullName || val?.name || val?.displayName || "").trim();
+        if (name && !name.toLowerCase().includes("comrade")) {
+          userNameCache.set(userId, name);
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem(`must_user_name_${userId}`, name); } catch {}
+          }
+          return name;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Fetch from /api/users?id=${userId}
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch(`/api/users?id=${encodeURIComponent(userId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const name = (data?.fullName || data?.name || data?.displayName || "").trim();
+        if (name && !name.toLowerCase().includes("comrade")) {
+          userNameCache.set(userId, name);
+          try { localStorage.setItem(`must_user_name_${userId}`, name); } catch {}
+          return name;
+        }
+      }
+    } catch {}
+  }
+
+  return "Student Seller";
+}
+
 export function subscribeToConversations(
   userId: string,
   callback: (conversations: Conversation[]) => void
 ): () => void {
   let cancelled = false;
 
+  // Helper to enrich conversations with real user names
+  const enrichWithRealNames = (convList: Conversation[]) => {
+    convList.forEach((c) => {
+      if (
+        !c.otherUserName ||
+        c.otherUserName.toLowerCase().includes("comrade") ||
+        c.otherUserName.toLowerCase() === "must seller" ||
+        c.otherUserName === "Seller"
+      ) {
+        resolveRealUserName(c.otherUserId).then((realName) => {
+          if (
+            !cancelled &&
+            realName &&
+            !realName.toLowerCase().includes("comrade") &&
+            c.otherUserName !== realName
+          ) {
+            c.otherUserName = realName;
+            saveLocalConversations(userId, convList);
+            callback([...convList]);
+          }
+        });
+      }
+    });
+  };
+
   // Push initial cached conversations immediately
   const initial = getLocalConversations(userId);
-  if (initial.length > 0) callback(initial);
+  if (initial.length > 0) {
+    callback(initial);
+    enrichWithRealNames(initial);
+  }
 
   // Fetch from server API (cross-browser source of truth)
   const fetchFromServer = async () => {
@@ -1147,6 +1247,7 @@ export function subscribeToConversations(
           const merged = deduplicateConversations([...serverConvs, ...local]);
           saveLocalConversations(userId, merged);
           callback(merged);
+          enrichWithRealNames(merged);
         }
       }
     } catch {}
@@ -1183,10 +1284,12 @@ export function subscribeToConversations(
                 const parts = k.split("_");
                 otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
               }
+              const rawName = item.otherUserName;
+              const hasValidName = rawName && !rawName.toLowerCase().includes("comrade");
               return {
                 id: k,
                 otherUserId: otherId || "",
-                otherUserName: item.otherUserName || "MUST Comrade",
+                otherUserName: hasValidName ? rawName : (userNameCache.get(otherId || "") || "Student Seller"),
                 lastMessage: item.lastMessage || "",
                 lastMessageTime: item.lastMessageTime || String(Date.now()),
                 unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
@@ -1198,6 +1301,7 @@ export function subscribeToConversations(
             const cleanedList = deduplicateConversations(list);
             saveLocalConversations(userId, cleanedList);
             callback(cleanedList);
+            enrichWithRealNames(cleanedList);
           }
         },
         (err) => {
@@ -1221,8 +1325,9 @@ export function subscribeToMessages(
   callback: (messages: Message[]) => void
 ): () => void {
   let cancelled = false;
-  // Track last message IDs to avoid re-rendering duplicates
-  let lastMsgFingerprint = "";
+  // Track last message IDs to avoid re-rendering duplicates.
+  // Set to null initially so empty list [] fires on first call immediately!
+  let lastMsgFingerprint: string | null = null;
 
   const dedupeAndEmit = (msgs: Message[]) => {
     if (cancelled) return;
@@ -1256,15 +1361,15 @@ export function subscribeToMessages(
     }
 
     const fingerprint = cleanList.map((m) => `${m.id}_${m.timestamp}`).join(",");
-    if (fingerprint === lastMsgFingerprint) return; // no change
+    if (lastMsgFingerprint !== null && fingerprint === lastMsgFingerprint) return; // no change
     lastMsgFingerprint = fingerprint;
     saveLocalMessages(conversationId, cleanList);
     callback(cleanList);
   };
 
-  // Return current cached messages immediately
+  // Return current cached messages immediately (even if empty [])
   const current = getLocalMessages(conversationId);
-  if (current.length > 0) dedupeAndEmit(current);
+  dedupeAndEmit(current);
 
   // Fetch from server API (cross-browser source of truth)
   const fetchFromServer = async () => {
@@ -1311,6 +1416,9 @@ export function subscribeToMessages(
               id: k,
             }));
             dedupeAndEmit(list);
+          } else {
+            // Immediately emit empty array when RTDB has no messages yet
+            dedupeAndEmit([]);
           }
         },
         (err) => {
@@ -1342,15 +1450,30 @@ export async function sendMessage(params: {
 }): Promise<void> {
   const {
     senderId,
-    senderName,
+    senderName: rawSenderName,
     receiverId,
-    receiverName,
+    receiverName: rawReceiverName,
     content,
     productId,
     productTitle,
     imageUrl,
     audioUrl,
   } = params;
+
+  if (senderId === receiverId) {
+    console.warn("Cannot send message to oneself");
+    return;
+  }
+
+  // Ensure real names are always used (never fallback to generic "MUST Comrade")
+  let senderName = (rawSenderName || "").trim();
+  if (!senderName || senderName.toLowerCase().includes("comrade") || senderName === "MUST Student") {
+    senderName = await resolveRealUserName(senderId);
+  }
+  let receiverName = (rawReceiverName || "").trim();
+  if (!receiverName || receiverName.toLowerCase().includes("comrade") || receiverName === "MUST Seller" || receiverName === "Seller") {
+    receiverName = await resolveRealUserName(receiverId);
+  }
 
   const conversationId = getConversationId(senderId, receiverId);
   const timestamp = String(Date.now());

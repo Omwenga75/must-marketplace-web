@@ -23,6 +23,7 @@ import {
   subscribeToTyping,
   setTypingStatus,
   deduplicateConversations,
+  resolveRealUserName,
 } from "@/lib/firebase/services";
 import { formatRelativeTime, formatMessageTime, isAdministratorEmail } from "@/lib/utils";
 import { resolveCanonicalId } from "@/lib/userCanonical";
@@ -172,9 +173,12 @@ function MessagesContent() {
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeToConversations(user.id, (convs) => {
-      // Filter out demo conversations so only real user-to-user chats appear
+      // Filter out self-conversations and demo conversations
       const realConvs = convs.filter(
         (c) =>
+          c.otherUserId !== user.id &&
+          (!user.email || c.otherUserId?.toLowerCase() !== user.email.toLowerCase()) &&
+          (!user.phone || c.otherUserId?.replace(/\D/g, "") !== user.phone.replace(/\D/g, "")) &&
           c.otherUserId !== "demo_seller_456" &&
           c.otherUserId !== "demo_admin_789" &&
           c.otherUserId !== "system_admin" &&
@@ -187,15 +191,37 @@ function MessagesContent() {
 
       // Handle query param target conversation from product page
       if (sellerIdQuery) {
+        // Prevent chatting with oneself
+        const isSelf =
+          sellerIdQuery === user.id ||
+          (user.email && sellerIdQuery.toLowerCase() === user.email.toLowerCase()) ||
+          (user.phone && sellerIdQuery.replace(/\D/g, "") === user.phone.replace(/\D/g, ""));
+        if (isSelf) {
+          router.replace("/messages");
+          return;
+        }
+
         const targetConvId = getConversationId(user.id, sellerIdQuery);
-        const targetName = (sellerNameQuery || "").trim() || "MUST Seller";
+        const validQueryName =
+          sellerNameQuery &&
+          !sellerNameQuery.toLowerCase().includes("comrade") &&
+          sellerNameQuery.trim() !== "Seller" &&
+          sellerNameQuery.trim() !== "MUST Seller"
+            ? sellerNameQuery.trim()
+            : null;
+        const targetName = validQueryName || "Student Seller";
+
         const existing = dedupled.find(
           (c) =>
             c.id === targetConvId ||
             c.otherUserId === sellerIdQuery ||
-            (sellerNameQuery && c.otherUserName?.trim().toLowerCase() === sellerNameQuery.trim().toLowerCase())
+            (validQueryName && c.otherUserName?.trim().toLowerCase() === validQueryName.toLowerCase())
         );
+
         if (existing) {
+          if (validQueryName && (!existing.otherUserName || existing.otherUserName.toLowerCase().includes("comrade"))) {
+            existing.otherUserName = validQueryName;
+          }
           openConversation(existing);
         } else {
           const newTarget: Conversation = {
@@ -209,6 +235,17 @@ function MessagesContent() {
             productTitle: productTitleQuery || undefined,
           };
           setActiveConversation(newTarget);
+
+          // If query param didn't provide a real name, resolve it asynchronously
+          if (!validQueryName) {
+            resolveRealUserName(sellerIdQuery).then((realName) => {
+              if (realName && !realName.toLowerCase().includes("comrade")) {
+                setActiveConversation((prev) =>
+                  prev && prev.id === targetConvId ? { ...prev, otherUserName: realName } : prev
+                );
+              }
+            });
+          }
         }
       }
     });
@@ -250,6 +287,11 @@ function MessagesContent() {
       }
     });
 
+    // Fallback: Ensure skeleton clears if messages callback is delayed
+    const fallbackTimer = setTimeout(() => {
+      setMessagesLoaded(true);
+    }, 800);
+
     const unsubTyping = subscribeToTyping(
       activeConversation.id,
       activeConversation.otherUserId,
@@ -257,10 +299,37 @@ function MessagesContent() {
     );
 
     return () => {
+      clearTimeout(fallbackTimer);
       unsubMessages();
       unsubTyping();
     };
   }, [activeConversation?.id, user?.id]);
+
+  // Ensure active conversation always shows real user name, never generic fallback
+  useEffect(() => {
+    if (!activeConversation) return;
+    const name = activeConversation.otherUserName;
+    if (
+      !name ||
+      name.toLowerCase().includes("comrade") ||
+      name === "MUST Seller" ||
+      name === "Seller" ||
+      name === "Student Seller"
+    ) {
+      resolveRealUserName(activeConversation.otherUserId).then((realName) => {
+        if (realName && !realName.toLowerCase().includes("comrade") && realName !== "Student Seller") {
+          setActiveConversation((prev) =>
+            prev && prev.id === activeConversation.id ? { ...prev, otherUserName: realName } : prev
+          );
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === activeConversation.id ? { ...c, otherUserName: realName } : c
+            )
+          );
+        }
+      });
+    }
+  }, [activeConversation?.id, activeConversation?.otherUserId]);
 
   // Scroll to bottom when conversation changes
   useEffect(() => {
@@ -271,6 +340,10 @@ function MessagesContent() {
   const handleSendDirectMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newMessageText.trim() || !user || !activeConversation || sendingDirect) return;
+    if (activeConversation.otherUserId === user.id) {
+      console.warn("Cannot send message to oneself");
+      return;
+    }
 
     const content = newMessageText.trim();
     setNewMessageText("");
@@ -380,7 +453,7 @@ function MessagesContent() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                          {conv.otherUserName || "MUST Comrade"}
+                          {conv.otherUserName || "Student Seller"}
                         </p>
                         <span className="text-[10px] text-slate-400 shrink-0">
                           {formatRelativeTime(conv.lastMessageTime)}
@@ -441,11 +514,11 @@ function MessagesContent() {
 
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                    {activeConversation.otherUserName || "MUST Comrade"}
+                    {activeConversation.otherUserName || "Student Seller"}
                   </h3>
                   <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Active now · MUST Comrade</span>
+                    <span>Active now · Student Seller</span>
                   </p>
                 </div>
               </div>
