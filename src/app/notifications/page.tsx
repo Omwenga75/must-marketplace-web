@@ -43,59 +43,43 @@ import { formatRelativeTime, isAdministratorEmail } from "@/lib/utils";
 const TYPE_CONFIG: Record<
   string,
   {
-    icon: React.ReactNode;
     gradient: string;
-    iconColor: string;
     label: string;
     accentClass: string;
   }
 > = {
   welcome: {
-    icon: <Sparkles className="w-[18px] h-[18px]" />,
     gradient: "from-emerald-400 to-teal-500",
-    iconColor: "text-white",
     label: "Welcome",
     accentClass: "border-l-emerald-500",
   },
   message: {
-    icon: <MessageCircle className="w-[18px] h-[18px]" />,
     gradient: "from-blue-400 to-indigo-500",
-    iconColor: "text-white",
     label: "Message",
     accentClass: "border-l-blue-500",
   },
   security: {
-    icon: <ShieldCheck className="w-[18px] h-[18px]" />,
     gradient: "from-amber-400 to-orange-500",
-    iconColor: "text-white",
     label: "Safety",
     accentClass: "border-l-amber-500",
   },
   listing: {
-    icon: <Package className="w-[18px] h-[18px]" />,
     gradient: "from-violet-400 to-purple-500",
-    iconColor: "text-white",
     label: "New Listing",
     accentClass: "border-l-violet-500",
   },
   price: {
-    icon: <Tag className="w-[18px] h-[18px]" />,
     gradient: "from-rose-400 to-pink-500",
-    iconColor: "text-white",
     label: "Price Drop",
     accentClass: "border-l-rose-500",
   },
   tip: {
-    icon: <Star className="w-[18px] h-[18px]" />,
     gradient: "from-yellow-400 to-amber-500",
-    iconColor: "text-white",
     label: "Tip",
     accentClass: "border-l-yellow-500",
   },
   system: {
-    icon: <Megaphone className="w-[18px] h-[18px]" />,
     gradient: "from-slate-400 to-slate-500",
-    iconColor: "text-white",
     label: "Announcement",
     accentClass: "border-l-slate-400",
   },
@@ -104,9 +88,7 @@ const TYPE_CONFIG: Record<
 function getConfig(type: string) {
   return (
     TYPE_CONFIG[type.toLowerCase()] ?? {
-      icon: <Bell className="w-[18px] h-[18px]" />,
       gradient: "from-slate-400 to-slate-500",
-      iconColor: "text-white",
       label: "Update",
       accentClass: "border-l-slate-400",
     }
@@ -135,16 +117,13 @@ type FilterKey = "all" | "unread" | "read" | "today" | "this_week";
 // ─── Shimmer ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="flex items-start gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 animate-pulse">
-      <div className="w-11 h-11 rounded-2xl bg-slate-200 dark:bg-slate-700 shrink-0" />
-      <div className="flex-1 space-y-3 pt-0.5">
-        <div className="flex justify-between gap-4">
-          <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded-full w-2/5" />
-          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-12 shrink-0" />
-        </div>
-        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full w-full" />
-        <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4" />
+    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 animate-pulse space-y-3">
+      <div className="flex justify-between gap-4">
+        <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded-full w-2/5" />
+        <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-12 shrink-0" />
       </div>
+      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full w-full" />
+      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full w-3/4" />
     </div>
   );
 }
@@ -165,23 +144,13 @@ function NotificationCard({
   return (
     <div
       onClick={() => !isRead && onMarkRead(notif.id)}
-      className={`group relative flex items-start gap-4 p-5 rounded-2xl border-l-4 border border-slate-100 dark:border-slate-800/80 transition-all duration-200 ${
+      className={`group relative p-5 rounded-2xl border-l-4 border border-slate-100 dark:border-slate-800/80 transition-all duration-200 ${
         isRead
           ? `${cfg.accentClass} opacity-60 bg-white dark:bg-slate-900 hover:opacity-95`
           : `${cfg.accentClass} bg-white dark:bg-slate-900 shadow-xs hover:shadow-md cursor-pointer hover:border-slate-300 dark:hover:border-slate-700`
       }`}
     >
-      {/* Icon bubble */}
-      <div
-        className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${cfg.gradient} flex items-center justify-center shrink-0 shadow-sm ${
-          isRead ? "opacity-50" : "shadow-md"
-        }`}
-      >
-        <span className={cfg.iconColor}>{cfg.icon}</span>
-      </div>
-
-      {/* Body */}
-      <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="min-w-0 space-y-1.5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <p
@@ -198,8 +167,7 @@ function NotificationCard({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap mt-0.5">
-              <Clock className="w-3 h-3" />
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
               {formatRelativeTime(notif.timestamp)}
             </span>
             <button
@@ -208,9 +176,9 @@ function NotificationCard({
                 onDelete(notif.id);
               }}
               title="Delete notification"
-              className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+              className="px-2 py-0.5 rounded-md text-[11px] font-semibold text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              Delete
             </button>
           </div>
         </div>
@@ -235,8 +203,8 @@ function NotificationCard({
             </span>
           )}
           {isRead && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
-              <CheckCheck className="w-3 h-3" /> Read
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+              Read
             </span>
           )}
         </div>
