@@ -77,7 +77,7 @@ function ChatBubbleSkeleton({ isMine }: { isMine: boolean }) {
 
 function MessagesPageSkeleton() {
   return (
-    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex animate-pulse">
+    <div className="w-full h-[calc(100dvh-3.5rem-4rem)] sm:h-[calc(100vh-4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex animate-pulse">
       {/* ── LEFT SIDEBAR SKELETON ── */}
       <aside className="w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 space-y-3">
@@ -622,7 +622,7 @@ function MessagesContent() {
   }
 
   return (
-    <div className="w-full h-[calc(100dvh_-_7.5rem)] sm:h-[calc(100vh_-_4rem)] max-h-[calc(100dvh_-_7.5rem)] sm:max-h-[calc(100vh_-_4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex select-none">
+    <div className="w-full h-[calc(100dvh-3.5rem-4rem)] sm:h-[calc(100vh-4rem)] overflow-hidden bg-slate-100/70 dark:bg-slate-950 flex select-none">
       {/* ── LEFT SIDEBAR: Direct Conversations ───────────────────────────────── */}
       <aside
         className={`w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900 ${
@@ -754,7 +754,7 @@ function MessagesContent() {
       </aside>
 
       {/* ── RIGHT MAIN AREA: Direct Chat Window ─────────────────────────────── */}
-      <main className="flex-1 flex flex-col h-full bg-white dark:bg-slate-950 min-w-0 overflow-hidden">
+      <main className={`flex-1 flex-col h-full bg-white dark:bg-slate-950 min-w-0 overflow-hidden ${activeConversation ? "flex" : "hidden md:flex"}`}>
         {activeConversation ? (
           <>
             {/* Direct Chat Top Bar (NO CALL BUTTONS as requested) */}
