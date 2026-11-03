@@ -3,6 +3,11 @@ import fs from "fs";
 import path from "path";
 import { Conversation } from "@/types";
 import { resolveCanonicalId } from "@/lib/userCanonical";
+import {
+  getFirebaseConversations,
+  saveFirebaseConversation,
+  deleteFirebaseConversation,
+} from "@/lib/firebase/admin";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const CONVERSATIONS_FILE = path.join(DATA_DIR, "conversations.json");
@@ -101,10 +106,24 @@ export async function GET(req: Request) {
   }
 
   const canonUser = resolveCanonicalId(userId);
+
+  // 1. Fetch live from Firebase RTDB (source of truth across all devices)
+  let fbConvs: Conversation[] = [];
+  try {
+    fbConvs = await getFirebaseConversations(userId);
+    if (canonUser !== userId && fbConvs.length === 0) {
+      const canonConvs = await getFirebaseConversations(canonUser);
+      fbConvs = [...fbConvs, ...canonConvs];
+    }
+  } catch (err) {
+    console.warn("Failed to fetch Firebase conversations:", err);
+  }
+
+  // 2. Fetch from local conversations file
   const threads = ensureConversationsFile();
   const userThreads = threads.filter((t) => matchesUser(userId, t));
 
-  const result: Conversation[] = [];
+  const localConvs: Conversation[] = [];
   const seenOthers = new Set<string>();
 
   for (const t of userThreads) {
@@ -125,7 +144,7 @@ export async function GET(req: Request) {
 
     const unread = t.unreadCounts[userId] ?? t.unreadCounts[canonUser] ?? 0;
 
-    result.push({
+    localConvs.push({
       id: t.id,
       otherUserId: otherId,
       otherUserName: otherName,
@@ -137,6 +156,20 @@ export async function GET(req: Request) {
     });
   }
 
+  // 3. Merge Firebase + Local (Firebase is primary)
+  const combinedMap = new Map<string, Conversation>();
+  localConvs.forEach((c) => {
+    if (c.otherUserId && c.otherUserId !== userId) {
+      combinedMap.set(c.id, c);
+    }
+  });
+  fbConvs.forEach((c) => {
+    if (c.otherUserId && c.otherUserId !== userId) {
+      combinedMap.set(c.id, c);
+    }
+  });
+
+  const result = Array.from(combinedMap.values());
   result.sort((a, b) => Number(b.lastMessageTime || 0) - Number(a.lastMessageTime || 0));
 
   return NextResponse.json(result, {
@@ -152,6 +185,12 @@ export async function POST(req: Request) {
 
     if (!conversationId) {
       return NextResponse.json({ error: "conversationId required" }, { status: 400 });
+    }
+
+    if (action === "delete" && userId) {
+      try {
+        await deleteFirebaseConversation(userId, conversationId);
+      } catch {}
     }
 
     const canonUser = resolveCanonicalId(userId || "");
@@ -192,19 +231,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, thread });
     }
 
-    return NextResponse.json({ success: false, error: "Conversation not found" }, { status: 404 });
+    return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || "Failed to update conversation" }, { status: 500 });
   }
 }
 
-// DELETE /api/conversations?conversationId=...
+// DELETE /api/conversations?conversationId=...&userId=...
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
+    const userId = searchParams.get("userId");
     if (!conversationId) {
       return NextResponse.json({ error: "conversationId required" }, { status: 400 });
+    }
+    if (userId) {
+      try {
+        await deleteFirebaseConversation(userId, conversationId);
+      } catch {}
     }
     const threads = ensureConversationsFile();
     const updated = threads.filter((t) => t.id !== conversationId);

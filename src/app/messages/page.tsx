@@ -279,19 +279,33 @@ function MessagesContent() {
 
     const unsub = subscribeToConversations(user.id, (convs) => {
       clearTimeout(loadedFallback);
+      const userPhoneClean = (user.phone || "").replace(/\D/g, "");
+      const userEmailLower = (user.email || "").toLowerCase().trim();
+
       // Filter out self-conversations, empty IDs, and demo conversations
-      const realConvs = convs.filter(
-        (c) =>
-          c.otherUserId &&                                                          // must have a real ID
-          c.otherUserId !== user.id &&
-          (!user.email || c.otherUserId?.toLowerCase() !== user.email.toLowerCase()) &&
-          (!user.phone || c.otherUserId?.replace(/\D/g, "") !== user.phone.replace(/\D/g, "")) &&
-          c.otherUserId !== "demo_seller_456" &&
-          c.otherUserId !== "demo_admin_789" &&
-          c.otherUserId !== "system_admin" &&
-          !c.otherUserName?.toLowerCase().includes("support desk") &&
-          !c.otherUserName?.toLowerCase().includes("james mutua")
-      );
+      const realConvs = convs.filter((c) => {
+        if (!c.otherUserId) return false;
+        if (c.otherUserId === user.id) return false;
+        if (userEmailLower && c.otherUserId.toLowerCase().trim() === userEmailLower) return false;
+        if (userPhoneClean.length >= 9) {
+          const otherPhoneClean = c.otherUserId.replace(/\D/g, "");
+          if (otherPhoneClean.length >= 9 && otherPhoneClean === userPhoneClean) return false;
+        }
+        if (
+          c.otherUserId === "demo_seller_456" ||
+          c.otherUserId === "demo_admin_789" ||
+          c.otherUserId === "system_admin"
+        ) {
+          return false;
+        }
+        if (
+          c.otherUserName?.toLowerCase().includes("support desk") ||
+          c.otherUserName?.toLowerCase().includes("james mutua")
+        ) {
+          return false;
+        }
+        return true;
+      });
       const dedupled = deduplicateConversations(realConvs);
       setConversations(dedupled);
       setConversationsLoaded(true);

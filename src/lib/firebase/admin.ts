@@ -8,7 +8,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { Product, User } from "@/types";
+import { Product, User, Conversation, Message } from "@/types";
 import { SAMPLE_CATEGORIES } from "@/lib/constants";
 
 const RTDB_BASE =
@@ -413,4 +413,137 @@ export async function saveFirebaseDeletedUser(id: string): Promise<void> {
     method: "PUT",
     body: JSON.stringify({ deletedAt: Date.now() }),
   });
+}
+
+// ── Chat & Conversation Operations ──────────────────────────────────────────
+
+/** Fetch all conversations for a user directly from Firebase RTDB */
+export async function getFirebaseConversations(userId: string): Promise<Conversation[]> {
+  if (!userId) return [];
+  const res = await rtdbRequest(`conversations/${encodeURIComponent(userId)}.json`);
+  if (!res.ok || !res.data || typeof res.data !== "object") return [];
+
+  const list: Conversation[] = [];
+  for (const [key, item] of Object.entries<any>(res.data)) {
+    if (!item || typeof item !== "object") continue;
+    let otherId = item.otherUserId;
+    if (!otherId && key.includes("_")) {
+      const parts = key.split("_");
+      otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
+    }
+    list.push({
+      id: item.id || key,
+      otherUserId: otherId || "",
+      otherUserName: item.otherUserName || "Student Seller",
+      lastMessage: item.lastMessage || "",
+      lastMessageTime: String(item.lastMessageTime || Date.now()),
+      unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
+      productId: item.productId || null,
+      productTitle: item.productTitle || null,
+      otherUserPhoto: item.otherUserPhoto || null,
+    });
+  }
+  return list;
+}
+
+/** Save or update a conversation node for a user in Firebase RTDB */
+export async function saveFirebaseConversation(
+  userId: string,
+  conversation: Conversation
+): Promise<boolean> {
+  if (!userId || !conversation || !conversation.id) return false;
+  const res = await rtdbRequest(
+    `conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversation.id)}.json`,
+    {
+      method: "PUT",
+      body: JSON.stringify(conversation),
+    }
+  );
+  return res.ok;
+}
+
+/** Delete a conversation from a user's node in Firebase RTDB */
+export async function deleteFirebaseConversation(
+  userId: string,
+  conversationId: string
+): Promise<boolean> {
+  if (!userId || !conversationId) return false;
+  const res = await rtdbRequest(
+    `conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversationId)}.json`,
+    {
+      method: "DELETE",
+    }
+  );
+  return res.ok;
+}
+
+/** Fetch all messages for a conversation directly from Firebase RTDB */
+export async function getFirebaseMessages(conversationId: string): Promise<Message[]> {
+  if (!conversationId) return [];
+  const res = await rtdbRequest(`messages/${encodeURIComponent(conversationId)}.json`);
+  if (!res.ok || !res.data || typeof res.data !== "object") return [];
+
+  const msgs: Message[] = [];
+  for (const [id, m] of Object.entries<any>(res.data)) {
+    if (m && typeof m === "object") {
+      msgs.push({
+        id: m.id || id,
+        senderId: m.senderId || "",
+        receiverId: m.receiverId || "",
+        content: m.content || "",
+        timestamp: String(m.timestamp || Date.now()),
+        isRead: Boolean(m.isRead),
+        productId: m.productId || null,
+        imageUrl: m.imageUrl || null,
+        audioUrl: m.audioUrl || null,
+        reactions: m.reactions || (m.reaction ? { default: m.reaction } : undefined),
+        isEdited: Boolean(m.isEdited),
+        editedAt: m.editedAt || null,
+        isDeleted: Boolean(m.isDeleted),
+      });
+    }
+  }
+  return msgs.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+}
+
+/** Save a message to Firebase RTDB */
+export async function saveFirebaseMessage(
+  conversationId: string,
+  message: Message
+): Promise<boolean> {
+  if (!conversationId || !message || !message.id) return false;
+  const res = await rtdbRequest(
+    `messages/${encodeURIComponent(conversationId)}/${encodeURIComponent(message.id)}.json`,
+    {
+      method: "PUT",
+      body: JSON.stringify(message),
+    }
+  );
+  return res.ok;
+}
+
+/** Update a message in Firebase RTDB (edit, reaction, delete) */
+export async function updateFirebaseMessage(
+  conversationId: string,
+  messageId: string,
+  updates: Partial<Message>
+): Promise<boolean> {
+  if (!conversationId || !messageId) return false;
+  const res = await rtdbRequest(
+    `messages/${encodeURIComponent(conversationId)}/${encodeURIComponent(messageId)}.json`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    }
+  );
+  return res.ok;
+}
+
+/** Clear all messages for a conversation in Firebase RTDB */
+export async function clearFirebaseMessages(conversationId: string): Promise<boolean> {
+  if (!conversationId) return false;
+  const res = await rtdbRequest(`messages/${encodeURIComponent(conversationId)}.json`, {
+    method: "DELETE",
+  });
+  return res.ok;
 }

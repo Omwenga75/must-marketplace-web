@@ -3,6 +3,13 @@ import fs from "fs";
 import path from "path";
 import { Message } from "@/types";
 import { resolveCanonicalId, getCanonicalConversationId } from "@/lib/userCanonical";
+import {
+  getFirebaseMessages,
+  saveFirebaseMessage,
+  updateFirebaseMessage,
+  clearFirebaseMessages,
+  saveFirebaseConversation,
+} from "@/lib/firebase/admin";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
@@ -83,6 +90,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "conversationId parameter required" }, { status: 400 });
   }
 
+  // 1. Fetch live messages from Firebase RTDB (cross-device source of truth)
+  let fbMsgs: Message[] = [];
+  try {
+    fbMsgs = await getFirebaseMessages(rawConvId);
+    if (fbMsgs.length === 0 && rawConvId.includes("_")) {
+      const parts = rawConvId.split("_");
+      const c1 = resolveCanonicalId(parts[0]);
+      const c2 = resolveCanonicalId(parts.slice(1).join("_"));
+      const canonId = getCanonicalConversationId(c1, c2);
+      if (canonId !== rawConvId) {
+        fbMsgs = await getFirebaseMessages(canonId);
+      }
+    }
+  } catch (err) {
+    console.warn("Failed fetching Firebase messages:", err);
+  }
+
   const allMessages = ensureMessagesFile();
 
   // Try exact match first
@@ -115,8 +139,17 @@ export async function GET(req: Request) {
     }
   }
 
+  // Merge Firebase + local by ID
+  const msgMap = new Map<string, Message>();
+  list.forEach((m) => {
+    if (m && m.id) msgMap.set(m.id, m);
+  });
+  fbMsgs.forEach((m) => {
+    if (m && m.id) msgMap.set(m.id, m);
+  });
+
   // Sort chronologically
-  const sorted = [...list].sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+  const sorted = Array.from(msgMap.values()).sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
 
   return NextResponse.json(sorted, {
     headers: { "Cache-Control": "no-store, max-age=0" },
@@ -253,6 +286,36 @@ export async function POST(req: Request) {
 
     saveConversationsFile(threads);
 
+    // 3. Save to Firebase RTDB directly from server (source of truth across all devices)
+    try {
+      await saveFirebaseMessage(canonConvId, newMessage);
+      if (rawConvId !== canonConvId) {
+        await saveFirebaseMessage(rawConvId, newMessage);
+      }
+      await saveFirebaseConversation(senderId, {
+        id: canonConvId,
+        otherUserId: receiverId,
+        otherUserName: receiverName || "MUST Seller",
+        lastMessage: preview,
+        lastMessageTime: timestamp,
+        unreadCount: 0,
+        productId: productId || null,
+        productTitle: productTitle || null,
+      });
+      await saveFirebaseConversation(receiverId, {
+        id: canonConvId,
+        otherUserId: senderId,
+        otherUserName: senderName || "MUST Student",
+        lastMessage: preview,
+        lastMessageTime: timestamp,
+        unreadCount: 1,
+        productId: productId || null,
+        productTitle: productTitle || null,
+      });
+    } catch (e) {
+      console.warn("Failed saving message to Firebase RTDB:", e);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -281,36 +344,64 @@ export async function PATCH(req: Request) {
     const list = allMessages[conversationId] || [];
     const index = list.findIndex((m) => m.id === messageId);
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    let targetMsg: Message | null = null;
+    if (index >= 0) {
+      targetMsg = { ...list[index] };
     }
 
-    const targetMsg = { ...list[index] };
+    const fallbackMsg: Message = {
+      id: messageId,
+      senderId: "",
+      receiverId: "",
+      timestamp: String(Date.now()),
+      isRead: false,
+      content: "",
+    };
 
     if (action === "edit") {
-      targetMsg.content = content || "";
-      targetMsg.isEdited = true;
-      targetMsg.editedAt = String(Date.now());
+      targetMsg = {
+        ...(targetMsg || fallbackMsg),
+        content: content || "",
+        isEdited: true,
+        editedAt: String(Date.now()),
+      };
     } else if (action === "delete") {
-      targetMsg.isDeleted = true;
-      targetMsg.content = "🚫 This message was deleted";
+      targetMsg = {
+        ...(targetMsg || fallbackMsg),
+        isDeleted: true,
+        content: "🚫 This message was deleted",
+      };
     } else if (action === "react") {
-      const reactions = { ...(targetMsg.reactions || {}) };
+      const reactions = { ...(targetMsg?.reactions || {}) };
       if (reactions[userId] === emoji) {
         delete reactions[userId];
       } else {
         reactions[userId] = emoji;
       }
-      targetMsg.reactions = reactions;
-      targetMsg.reaction = Object.values(reactions)[0] || null;
+      targetMsg = {
+        ...(targetMsg || fallbackMsg),
+        reactions,
+        reaction: Object.values(reactions)[0] || null,
+      };
     }
 
-    list[index] = targetMsg;
-    allMessages[conversationId] = list;
-    saveMessagesFile(allMessages);
+    if (targetMsg && index >= 0) {
+      list[index] = targetMsg;
+      allMessages[conversationId] = list;
+      saveMessagesFile(allMessages);
+    }
+
+    // Sync update to Firebase RTDB
+    if (targetMsg) {
+      try {
+        await updateFirebaseMessage(conversationId, messageId, targetMsg);
+      } catch (err) {
+        console.warn("Failed to update message in Firebase RTDB:", err);
+      }
+    }
 
     // If last message in thread was edited, update conversation preview
-    if (action === "edit" || action === "delete") {
+    if ((action === "edit" || action === "delete") && targetMsg) {
       const threads = ensureConversationsFile();
       const thread = threads.find((t) => t.id === conversationId);
       if (thread && index === list.length - 1) {
@@ -341,8 +432,17 @@ export async function DELETE(req: Request) {
     if (messageId) {
       const list = allMessages[conversationId] || [];
       allMessages[conversationId] = list.filter((m) => m.id !== messageId);
+      try {
+        await updateFirebaseMessage(conversationId, messageId, {
+          isDeleted: true,
+          content: "🚫 This message was deleted",
+        });
+      } catch {}
     } else {
       allMessages[conversationId] = [];
+      try {
+        await clearFirebaseMessages(conversationId);
+      } catch {}
     }
 
     saveMessagesFile(allMessages);

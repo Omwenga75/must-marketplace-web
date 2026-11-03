@@ -1055,7 +1055,8 @@ export function deduplicateConversations(convs: Conversation[]): Conversation[] 
     const nameKey = (c.otherUserName || "").trim().toLowerCase();
 
     if (idKey && seen.has(`id:${idKey}`)) continue;
-    if (nameKey && seen.has(`name:${nameKey}`)) continue;
+    const isGenericName = !nameKey || nameKey === "student seller" || nameKey === "seller" || nameKey.includes("comrade");
+    if (nameKey && !isGenericName && seen.has(`name:${nameKey}`)) continue;
 
     if (idKey) seen.add(`id:${idKey}`);
     if (nameKey) seen.add(`name:${nameKey}`);
