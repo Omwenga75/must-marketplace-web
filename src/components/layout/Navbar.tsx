@@ -256,8 +256,8 @@ export default function Navbar() {
               <Plus className="w-5 h-5 stroke-[2.5]" />
             </Link>
 
-            {/* Notifications Icon — Hidden for Admins */}
-            {user && !isUserAdmin && (
+            {/* Notifications Icon */}
+            {user && (
               <Link
                 href="/notifications"
                 className="relative p-1.5 sm:p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

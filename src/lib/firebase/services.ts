@@ -2002,10 +2002,14 @@ export function subscribeToNotifications(
   const listener = onValue(notifRef, (snapshot) => {
     if (snapshot.exists()) {
       const val = snapshot.val();
-      const list: AppNotification[] = Object.keys(val).map((k) => ({
-        ...val[k],
-        id: k,
-      }));
+      const list: AppNotification[] = (typeof val === "object" && val !== null)
+        ? Object.keys(val)
+            .filter((k) => val[k] && typeof val[k] === "object" && (val[k].title || val[k].message))
+            .map((k) => ({
+              ...val[k],
+              id: val[k].id || k,
+            }))
+        : [];
       list.sort((a, b) => b.timestamp - a.timestamp);
       const dedupled = deduplicateNotifications(list);
       saveLocalNotifications(userId, dedupled);
