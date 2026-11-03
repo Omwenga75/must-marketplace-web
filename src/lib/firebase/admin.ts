@@ -420,30 +420,83 @@ export async function saveFirebaseDeletedUser(id: string): Promise<void> {
 /** Fetch all conversations for a user directly from Firebase RTDB */
 export async function getFirebaseConversations(userId: string): Promise<Conversation[]> {
   if (!userId) return [];
-  const res = await rtdbRequest(`conversations/${encodeURIComponent(userId)}.json`);
-  if (!res.ok || !res.data || typeof res.data !== "object") return [];
+  const convMap = new Map<string, Conversation>();
 
-  const list: Conversation[] = [];
-  for (const [key, item] of Object.entries<any>(res.data)) {
-    if (!item || typeof item !== "object") continue;
-    let otherId = item.otherUserId;
-    if (!otherId && key.includes("_")) {
-      const parts = key.split("_");
-      otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
+  // 1. Fetch direct conversations owned by this user
+  const res = await rtdbRequest(`conversations/${encodeURIComponent(userId)}.json`);
+  if (res.ok && res.data && typeof res.data === "object") {
+    for (const [key, item] of Object.entries<any>(res.data)) {
+      if (!item || typeof item !== "object") continue;
+      let otherId = item.otherUserId;
+      if (!otherId && key.includes("_")) {
+        const parts = key.split("_");
+        otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
+      }
+      if (otherId && otherId !== userId) {
+        convMap.set(otherId, {
+          id: item.id || key,
+          otherUserId: otherId,
+          otherUserName: item.otherUserName || "Student Seller",
+          lastMessage: item.lastMessage || "",
+          lastMessageTime: String(item.lastMessageTime || Date.now()),
+          unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
+          productId: item.productId || null,
+          productTitle: item.productTitle || null,
+          otherUserPhoto: item.otherUserPhoto || null,
+        });
+      }
     }
-    list.push({
-      id: item.id || key,
-      otherUserId: otherId || "",
-      otherUserName: item.otherUserName || "Student Seller",
-      lastMessage: item.lastMessage || "",
-      lastMessageTime: String(item.lastMessageTime || Date.now()),
-      unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
-      productId: item.productId || null,
-      productTitle: item.productTitle || null,
-      otherUserPhoto: item.otherUserPhoto || null,
-    });
   }
-  return list;
+
+  // 2. Cross-reference all conversations in RTDB to catch any where userId is the counterparty
+  // (e.g. another user initiated the chat or it was only saved under the other participant)
+  try {
+    const allRes = await rtdbRequest("conversations.json");
+    if (allRes.ok && allRes.data && typeof allRes.data === "object") {
+      for (const [ownerId, ownerConvs] of Object.entries<any>(allRes.data)) {
+        if (ownerId === userId || !ownerConvs || typeof ownerConvs !== "object") continue;
+        for (const [cid, c] of Object.entries<any>(ownerConvs)) {
+          if (!c || typeof c !== "object") continue;
+          const isParticipant =
+            c.otherUserId === userId ||
+            (cid.includes("_") && (cid.split("_")[0] === userId || cid.split("_")[1] === userId));
+
+          if (isParticipant) {
+            const partnerId = ownerId;
+            if (!convMap.has(partnerId)) {
+              // Lookup partner's name from user data or fallback
+              let partnerName = c.senderName;
+              if (!partnerName || partnerName.toLowerCase().includes("comrade")) {
+                const partnerUser = await getFirebaseUserById(partnerId);
+                partnerName = partnerUser?.fullName || "Student Seller";
+              }
+
+              const mirroredConv: Conversation = {
+                id: cid,
+                otherUserId: partnerId,
+                otherUserName: partnerName,
+                lastMessage: c.lastMessage || "",
+                lastMessageTime: String(c.lastMessageTime || Date.now()),
+                unreadCount: 0,
+                productId: c.productId || null,
+                productTitle: c.productTitle || null,
+              };
+              convMap.set(partnerId, mirroredConv);
+
+              // Auto-heal RTDB so both sides stay permanently populated
+              saveFirebaseConversation(userId, mirroredConv).catch(() => {});
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Cross-reference conversations error:", err);
+  }
+
+  return Array.from(convMap.values()).sort(
+    (a, b) => Number(b.lastMessageTime || 0) - Number(a.lastMessageTime || 0)
+  );
 }
 
 /** Save or update a conversation node for a user in Firebase RTDB */
