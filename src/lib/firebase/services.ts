@@ -1298,10 +1298,17 @@ export function subscribeToConversations(
                 otherUserPhoto: item.otherUserPhoto || null,
               };
             });
-            const cleanedList = deduplicateConversations(list);
+            // Only keep conversations with a real otherUserId
+            const validList = list.filter((c) => c.otherUserId && c.otherUserId !== userId);
+            const cleanedList = deduplicateConversations(validList);
             saveLocalConversations(userId, cleanedList);
             callback(cleanedList);
             enrichWithRealNames(cleanedList);
+          } else {
+            // RTDB has no data — still fire callback so page can show whatever
+            // was already fetched from server API (don't block on empty RTDB)
+            const local = getLocalConversations(userId);
+            if (local.length > 0) callback(local);
           }
         },
         (err) => {

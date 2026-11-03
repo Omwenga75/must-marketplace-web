@@ -273,10 +273,16 @@ function MessagesContent() {
   // 1. Subscribe to Direct Conversations
   useEffect(() => {
     if (!user) return;
+
+    // Safety fallback: mark loaded after 4s even if callbacks haven't fired
+    const loadedFallback = setTimeout(() => setConversationsLoaded(true), 4000);
+
     const unsub = subscribeToConversations(user.id, (convs) => {
-      // Filter out self-conversations and demo conversations
+      clearTimeout(loadedFallback);
+      // Filter out self-conversations, empty IDs, and demo conversations
       const realConvs = convs.filter(
         (c) =>
+          c.otherUserId &&                                                          // must have a real ID
           c.otherUserId !== user.id &&
           (!user.email || c.otherUserId?.toLowerCase() !== user.email.toLowerCase()) &&
           (!user.phone || c.otherUserId?.replace(/\D/g, "") !== user.phone.replace(/\D/g, "")) &&
@@ -349,7 +355,10 @@ function MessagesContent() {
       }
     });
 
-    return () => unsub();
+    return () => {
+      clearTimeout(loadedFallback);
+      unsub();
+    };
   }, [user?.id, sellerIdQuery, sellerNameQuery, productIdQuery, productTitleQuery]);
 
   // 2. Subscribe to Active Direct Conversation Messages
