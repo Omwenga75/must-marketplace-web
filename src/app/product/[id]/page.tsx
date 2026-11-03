@@ -245,26 +245,6 @@ export default function ProductDetailPage() {
     )
   );
 
-  const handleChatWithSeller = () => {
-    if (!user) {
-      router.push(`/login?redirect=/product/${product.id}`);
-      return;
-    }
-    if (isOwner) {
-      router.push("/seller/dashboard");
-      return;
-    }
-    const sellerId = product.sellerId || "demo_seller_456";
-    const sellerName = product.sellerName || "Seller";
-    router.push(
-      `/messages?sellerId=${encodeURIComponent(sellerId)}&sellerName=${encodeURIComponent(
-        sellerName
-      )}&productId=${encodeURIComponent(product.id)}&productTitle=${encodeURIComponent(
-        product.title
-      )}`
-    );
-  };
-
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8">
       {/* Main Grid */}
@@ -444,7 +424,7 @@ export default function ProductDetailPage() {
                   <span>Your Campus Listing</span>
                 </div>
                 <p className="text-xs text-emerald-700/90 dark:text-emerald-400">
-                  This is your own advertisement. You cannot chat with yourself.
+                  This is your own advertisement.
                 </p>
                 <div className="pt-1">
                   <Link
@@ -456,29 +436,52 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ) : (
-              <>
-                <button
-                  onClick={handleChatWithSeller}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Chat with Seller Now</span>
-                </button>
+              <div className="space-y-3">
+                {(() => {
+                  const rawPhone = product.sellerPhone || "";
+                  let cleanDigits = rawPhone.replace(/[^0-9]/g, "");
+                  if (cleanDigits.startsWith("0") && cleanDigits.length === 10) {
+                    cleanDigits = "254" + cleanDigits.slice(1);
+                  } else if ((cleanDigits.startsWith("7") || cleanDigits.startsWith("1")) && cleanDigits.length === 9) {
+                    cleanDigits = "254" + cleanDigits;
+                  }
 
-                {product.sellerPhone && (
-                  <a
-                    href={`https://wa.me/${product.sellerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(
-                      `Hi ${product.sellerName}, I saw your listing for "${product.title}" on MUST Marketplace.`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Phone className="w-4 h-4 text-emerald-600" />
-                    <span>WhatsApp Seller ({product.sellerPhone})</span>
-                  </a>
-                )}
-              </>
+                  const waGreeting = `Hi ${product.sellerName || "Seller"}, I saw your listing for "${product.title}" on MUST Marketplace. Is it still available?`;
+                  const waUrl = cleanDigits
+                    ? `https://wa.me/${cleanDigits}?text=${encodeURIComponent(waGreeting)}`
+                    : null;
+
+                  return (
+                    <>
+                      {waUrl ? (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Chat on WhatsApp ({product.sellerPhone})</span>
+                        </a>
+                      ) : (
+                        <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-center text-xs font-semibold">
+                          Seller WhatsApp contact not available
+                        </div>
+                      )}
+
+                      {product.sellerPhone && (
+                        <a
+                          href={`tel:${product.sellerPhone.replace(/\s+/g, "")}`}
+                          className="w-full py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <Phone className="w-4 h-4 text-emerald-600" />
+                          <span>Call Seller Directly</span>
+                        </a>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
 

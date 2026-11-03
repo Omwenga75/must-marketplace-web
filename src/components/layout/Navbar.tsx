@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
-import { subscribeToConversations, subscribeToNotifications } from "@/lib/firebase/services";
+import { subscribeToNotifications } from "@/lib/firebase/services";
 import { isAdministratorEmail } from "@/lib/utils";
 
 export default function Navbar() {
@@ -45,7 +45,6 @@ export default function Navbar() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   // Initialize theme from documentElement class and synchronize with system settings
@@ -118,18 +117,12 @@ export default function Navbar() {
     window.dispatchEvent(new Event("must-theme-change"));
   };
 
-  // Subscribe to live unread counts if user is logged in
+  // Subscribe to live notification counts if user is logged in
   useEffect(() => {
     if (!user?.id) {
-      setUnreadMessages(0);
       setUnreadNotifs(0);
       return;
     }
-
-    const unsubConvs = subscribeToConversations(user.id, (convs) => {
-      const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-      setUnreadMessages(totalUnread);
-    });
 
     const unsubNotifs = subscribeToNotifications(user.id, (notifs) => {
       const unreadCount = notifs.filter((n) => !n.isRead).length;
@@ -137,7 +130,6 @@ export default function Navbar() {
     });
 
     return () => {
-      unsubConvs();
       unsubNotifs();
     };
   }, [user?.id]);
@@ -263,22 +255,6 @@ export default function Navbar() {
             >
               <Plus className="w-5 h-5 stroke-[2.5]" />
             </Link>
-
-            {/* Messages Icon (Desktop only, mobile has it in bottom nav) — Hidden for Admins */}
-            {user && !isUserAdmin && (
-              <Link
-                href="/messages"
-                className="hidden sm:inline-flex relative p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title="Messages"
-              >
-                <MessageCircle className="w-5 h-5" />
-                {unreadMessages > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-secondary text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
-                    {unreadMessages}
-                  </span>
-                )}
-              </Link>
-            )}
 
             {/* Notifications Icon — Hidden for Admins */}
             {user && !isUserAdmin && (
@@ -587,20 +563,20 @@ export default function Navbar() {
         </Link>
 
         <Link
-          href="/messages"
+          href="/saved"
           className={`flex flex-col items-center gap-0.5 p-1 relative ${
-            pathname?.startsWith("/messages")
+            pathname?.startsWith("/saved")
               ? "text-emerald-600 dark:text-emerald-400 font-bold"
               : ""
           }`}
         >
-          <MessageCircle className="w-5 h-5" />
-          {unreadMessages > 0 && (
-            <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-secondary text-white text-[9px] font-bold flex items-center justify-center">
-              {unreadMessages}
+          <Heart className="w-5 h-5" />
+          {mounted && favoriteIds.size > 0 && (
+            <span className="absolute top-0 right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+              {favoriteIds.size}
             </span>
           )}
-          <span>Chats</span>
+          <span>Saved</span>
         </Link>
 
         <Link

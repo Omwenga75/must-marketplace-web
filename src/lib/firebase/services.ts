@@ -31,6 +31,7 @@ import {
   ChatroomTopic,
 } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS, SAMPLE_CATEGORIES } from "../constants";
+import { resolveCanonicalId, getCanonicalConversationId } from "@/lib/userCanonical";
 
 // Helper for local caching to allow offline demo & resilience
 const LOCAL_STORAGE_PRODUCTS_KEY = "must_marketplace_cached_products";
@@ -999,7 +1000,7 @@ export async function becomeSeller(userId: string, phone: string, location: stri
 // ─────────────────────────────────────────────────────────────
 
 export function getConversationId(uid1: string, uid2: string): string {
-  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+  return getCanonicalConversationId(uid1, uid2);
 }
 
 // Helper broadcast channel for multi-tab live chat synchronization
@@ -1201,262 +1202,16 @@ export function subscribeToConversations(
   userId: string,
   callback: (conversations: Conversation[]) => void
 ): () => void {
-  let cancelled = false;
-
-  // Helper to enrich conversations with real user names
-  const enrichWithRealNames = (convList: Conversation[]) => {
-    convList.forEach((c) => {
-      if (
-        !c.otherUserName ||
-        c.otherUserName.toLowerCase().includes("comrade") ||
-        c.otherUserName.toLowerCase() === "must seller" ||
-        c.otherUserName === "Seller"
-      ) {
-        resolveRealUserName(c.otherUserId).then((realName) => {
-          if (
-            !cancelled &&
-            realName &&
-            !realName.toLowerCase().includes("comrade") &&
-            c.otherUserName !== realName
-          ) {
-            c.otherUserName = realName;
-            saveLocalConversations(userId, convList);
-            callback([...convList]);
-          }
-        });
-      }
-    });
-  };
-
-  // Push initial cached conversations immediately
-  const initial = getLocalConversations(userId);
-  if (initial.length > 0) {
-    callback(initial);
-    enrichWithRealNames(initial);
-  }
-
-  // Fetch from server API (cross-browser source of truth)
-  const fetchFromServer = async () => {
-    if (typeof window === "undefined" || cancelled) return;
-    try {
-      const res = await fetch(`/api/conversations?userId=${encodeURIComponent(userId)}`);
-      if (res.ok && !cancelled) {
-        const serverConvs: Conversation[] = await res.json();
-        if (Array.isArray(serverConvs) && serverConvs.length >= 0) {
-          // Merge server data with local data (server is authoritative)
-          const local = getLocalConversations(userId);
-          const merged = deduplicateConversations([...serverConvs, ...local]);
-          saveLocalConversations(userId, merged);
-          callback(merged);
-          enrichWithRealNames(merged);
-        }
-      }
-    } catch {}
-  };
-
-  fetchFromServer();
-
-  // Listen to multi-tab / local events
-  const unsubLocal = listenToChatSync((payload) => {
-    if (!payload || payload.type === "message" || payload.type === "conversation" || payload.type === "storage_change") {
-      fetchFromServer();
-    }
-  });
-
-  // Poll server every 3 seconds for cross-browser updates
-  const pollInterval = setInterval(() => {
-    if (!cancelled) fetchFromServer();
-  }, 3000);
-
-  // Attempt Firebase RTDB if available
-  let unsubFb: (() => void) | null = null;
-  if (database) {
-    try {
-      const convRef = ref(database, `conversations/${userId}`);
-      const listener = onValue(
-        convRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const val = snapshot.val();
-            const list: Conversation[] = Object.keys(val).map((k) => {
-              const item = val[k] || {};
-              let otherId = item.otherUserId;
-              if (!otherId && k.includes("_")) {
-                const parts = k.split("_");
-                otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
-              }
-              const rawName = item.otherUserName;
-              const hasValidName = rawName && !rawName.toLowerCase().includes("comrade");
-              return {
-                id: k,
-                otherUserId: otherId || "",
-                otherUserName: hasValidName ? rawName : (userNameCache.get(otherId || "") || "Student Seller"),
-                lastMessage: item.lastMessage || "",
-                lastMessageTime: item.lastMessageTime || String(Date.now()),
-                unreadCount: typeof item.unreadCount === "number" ? item.unreadCount : 0,
-                productId: item.productId || null,
-                productTitle: item.productTitle || null,
-                otherUserPhoto: item.otherUserPhoto || null,
-              };
-            });
-            // Only keep conversations with a real otherUserId
-            const validList = list.filter((c) => c.otherUserId && c.otherUserId !== userId);
-            const cleanedList = deduplicateConversations(validList);
-            saveLocalConversations(userId, cleanedList);
-            callback(cleanedList);
-            enrichWithRealNames(cleanedList);
-          } else {
-            // RTDB has no data — still fire callback so page can show whatever
-            // was already fetched from server API (don't block on empty RTDB)
-            const local = getLocalConversations(userId);
-            if (local.length > 0) callback(local);
-          }
-        },
-        (err) => {
-          console.debug("Firebase conversations falling back to local storage:", err.message);
-        }
-      );
-      unsubFb = () => off(convRef, "value", listener);
-    } catch {}
-  }
-
-  return () => {
-    cancelled = true;
-    clearInterval(pollInterval);
-    unsubLocal();
-    if (unsubFb) unsubFb();
-  };
+  callback([]);
+  return () => {};
 }
 
 export function subscribeToMessages(
   conversationId: string,
   callback: (messages: Message[]) => void
 ): () => void {
-  let cancelled = false;
-  // Track last message IDs to avoid re-rendering duplicates.
-  // Set to null initially so empty list [] fires on first call immediately!
-  let lastMsgFingerprint: string | null = null;
-
-  const dedupeAndEmit = (msgs: Message[]) => {
-    if (cancelled) return;
-    // 1. Deduplicate by exact message ID
-    const byId = new Map<string, Message>();
-    for (const m of msgs) {
-      if (m && m.id) byId.set(m.id, m);
-    }
-    const dedupedById = Array.from(byId.values()).sort(
-      (a, b) => Number(a.timestamp) - Number(b.timestamp)
-    );
-
-    // 2. Also deduplicate optimistic local message vs server message with close timestamp
-    const cleanList: Message[] = [];
-    for (const m of dedupedById) {
-      const isDuplicate = cleanList.some((existing) => {
-        if (existing.id === m.id) return true;
-        const timeDiff = Math.abs(Number(existing.timestamp) - Number(m.timestamp));
-        if (
-          existing.senderId === m.senderId &&
-          (existing.content || "").trim() === (m.content || "").trim() &&
-          timeDiff < 4000
-        ) {
-          return true;
-        }
-        return false;
-      });
-      if (!isDuplicate) {
-        cleanList.push(m);
-      }
-    }
-
-    const fingerprint = cleanList
-      .map(
-        (m) =>
-          `${m.id}_${m.timestamp}_${m.content}_${m.reaction || ""}_${Boolean(m.isEdited)}_${Boolean(m.isDeleted)}_${Object.keys(m.reactions || {}).length}`
-      )
-      .join(",");
-    if (lastMsgFingerprint !== null && fingerprint === lastMsgFingerprint) return; // no change
-    lastMsgFingerprint = fingerprint;
-    saveLocalMessages(conversationId, cleanList);
-    callback(cleanList);
-  };
-
-  // Return current cached messages immediately (even if empty [])
-  const current = getLocalMessages(conversationId);
-  dedupeAndEmit(current);
-
-  // Fetch from server API (cross-browser source of truth)
-  const fetchFromServer = async () => {
-    if (typeof window === "undefined" || cancelled) return;
-    try {
-      const res = await fetch(`/api/messages?conversationId=${encodeURIComponent(conversationId)}`);
-      if (res.ok && !cancelled) {
-        const serverMsgs: Message[] = await res.json();
-        if (Array.isArray(serverMsgs)) {
-          // Merge server + any optimistic local messages not yet on server
-          const local = getLocalMessages(conversationId);
-          const combined = [...serverMsgs, ...local];
-          dedupeAndEmit(combined);
-        }
-      }
-    } catch {}
-  };
-
-  fetchFromServer();
-
-  // Listen to real-time events across tabs
-  const unsubLocal = listenToChatSync((payload) => {
-    if (
-      payload?.conversationId === conversationId ||
-      payload?.type === "storage_change" ||
-      payload?.type === "message_edit" ||
-      payload?.type === "message_delete" ||
-      payload?.type === "message_reaction" ||
-      payload?.type === "messages_cleared"
-    ) {
-      const local = getLocalMessages(conversationId);
-      dedupeAndEmit(local);
-      fetchFromServer();
-    }
-  });
-
-  // Poll every 2 seconds for cross-browser messages
-  const pollInterval = setInterval(() => {
-    if (!cancelled) fetchFromServer();
-  }, 2000);
-
-  let unsubFb: (() => void) | null = null;
-  if (database) {
-    try {
-      const msgRef = ref(database, `messages/${conversationId}`);
-      const listener = onValue(
-        msgRef,
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const val = snapshot.val();
-            const list: Message[] = Object.keys(val).map((k) => ({
-              ...val[k],
-              id: k,
-            }));
-            dedupeAndEmit(list);
-          } else {
-            // Immediately emit empty array when RTDB has no messages yet
-            dedupeAndEmit([]);
-          }
-        },
-        (err) => {
-          console.debug("Firebase messages falling back to local storage:", err.message);
-        }
-      );
-      unsubFb = () => off(msgRef, "value", listener);
-    } catch {}
-  }
-
-  return () => {
-    cancelled = true;
-    clearInterval(pollInterval);
-    unsubLocal();
-    if (unsubFb) unsubFb();
-  };
+  callback([]);
+  return () => {};
 }
 
 export async function sendMessage(params: {
@@ -1773,7 +1528,7 @@ export async function deleteConversation(
 ): Promise<void> {
   // 1. Update local storage
   const convs = getLocalConversations(userId);
-  const remaining = convs.filter((c) => c.id !== conversationId);
+  const remaining = convs.filter((c) => c.id !== conversationId && c.otherUserId !== conversationId);
   saveLocalConversations(userId, remaining);
   saveLocalMessages(conversationId, []);
 

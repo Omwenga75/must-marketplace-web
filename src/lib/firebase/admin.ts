@@ -422,6 +422,32 @@ export async function getFirebaseConversations(userId: string): Promise<Conversa
   if (!userId) return [];
   const convMap = new Map<string, Conversation>();
 
+  // Fetch deleted conversations tombstones for this user
+  const deletedMap = new Map<string, number>();
+  try {
+    const delRes = await rtdbRequest(`deleted_conversations/${encodeURIComponent(userId)}.json`);
+    if (delRes.ok && delRes.data && typeof delRes.data === "object") {
+      for (const [k, v] of Object.entries<any>(delRes.data)) {
+        if (v && typeof v === "object" && v.deletedAt) {
+          deletedMap.set(k.toLowerCase(), Number(v.deletedAt));
+        } else if (typeof v === "number") {
+          deletedMap.set(k.toLowerCase(), v);
+        }
+      }
+    }
+  } catch {}
+
+  const isTombstoned = (convId: string, partnerId: string, lastMsgTime: string | number) => {
+    const timeNum = Number(lastMsgTime || 0);
+    const delTimeConv = deletedMap.get((convId || "").toLowerCase());
+    const delTimePartner = deletedMap.get((partnerId || "").toLowerCase());
+    const maxDelTime = Math.max(delTimeConv || 0, delTimePartner || 0);
+    if (maxDelTime > 0 && timeNum <= maxDelTime) {
+      return true;
+    }
+    return false;
+  };
+
   // 1. Fetch direct conversations owned by this user
   const res = await rtdbRequest(`conversations/${encodeURIComponent(userId)}.json`);
   if (res.ok && res.data && typeof res.data === "object") {
@@ -433,6 +459,14 @@ export async function getFirebaseConversations(userId: string): Promise<Conversa
         otherId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
       }
       if (otherId && otherId !== userId) {
+        if (isTombstoned(key, otherId, item.lastMessageTime)) {
+          // Clean up deleted node from user's active conversations
+          rtdbRequest(`conversations/${encodeURIComponent(userId)}/${encodeURIComponent(key)}.json`, {
+            method: "DELETE",
+          }).catch(() => {});
+          continue;
+        }
+
         convMap.set(otherId, {
           id: item.id || key,
           otherUserId: otherId,
@@ -449,7 +483,6 @@ export async function getFirebaseConversations(userId: string): Promise<Conversa
   }
 
   // 2. Cross-reference all conversations in RTDB to catch any where userId is the counterparty
-  // (e.g. another user initiated the chat or it was only saved under the other participant)
   try {
     const allRes = await rtdbRequest("conversations.json");
     if (allRes.ok && allRes.data && typeof allRes.data === "object") {
@@ -463,6 +496,10 @@ export async function getFirebaseConversations(userId: string): Promise<Conversa
 
           if (isParticipant) {
             const partnerId = ownerId;
+            if (isTombstoned(cid, partnerId, c.lastMessageTime)) {
+              continue; // Do NOT resurrect deleted conversation
+            }
+
             if (!convMap.has(partnerId)) {
               // Lookup partner's name from user data or fallback
               let partnerName = c.senderName;
@@ -505,6 +542,19 @@ export async function saveFirebaseConversation(
   conversation: Conversation
 ): Promise<boolean> {
   if (!userId || !conversation || !conversation.id) return false;
+
+  // Clear any past deletion tombstones for this user & conversation/partner
+  rtdbRequest(
+    `deleted_conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversation.id)}.json`,
+    { method: "DELETE" }
+  ).catch(() => {});
+  if (conversation.otherUserId) {
+    rtdbRequest(
+      `deleted_conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversation.otherUserId)}.json`,
+      { method: "DELETE" }
+    ).catch(() => {});
+  }
+
   const res = await rtdbRequest(
     `conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversation.id)}.json`,
     {
@@ -515,19 +565,55 @@ export async function saveFirebaseConversation(
   return res.ok;
 }
 
-/** Delete a conversation from a user's node in Firebase RTDB */
+/** Delete a conversation from a user's node in Firebase RTDB and record deletion tombstone */
 export async function deleteFirebaseConversation(
   userId: string,
   conversationId: string
 ): Promise<boolean> {
   if (!userId || !conversationId) return false;
-  const res = await rtdbRequest(
+
+  // 1. Remove from active conversations
+  await rtdbRequest(
     `conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversationId)}.json`,
     {
       method: "DELETE",
     }
   );
-  return res.ok;
+
+  let partnerId = "";
+  if (conversationId.includes("_")) {
+    const parts = conversationId.split("_");
+    partnerId = parts[0] === userId ? parts.slice(1).join("_") : parts[0];
+  }
+  if (partnerId) {
+    await rtdbRequest(
+      `conversations/${encodeURIComponent(userId)}/${encodeURIComponent(partnerId)}.json`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
+  // 2. Record tombstone with timestamp so cross-referencing does not resurrect it
+  const now = Date.now();
+  await rtdbRequest(
+    `deleted_conversations/${encodeURIComponent(userId)}/${encodeURIComponent(conversationId)}.json`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ deletedAt: now }),
+    }
+  );
+  if (partnerId) {
+    await rtdbRequest(
+      `deleted_conversations/${encodeURIComponent(userId)}/${encodeURIComponent(partnerId)}.json`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ deletedAt: now }),
+      }
+    );
+  }
+
+  return true;
 }
 
 /** Fetch all messages for a conversation directly from Firebase RTDB */
