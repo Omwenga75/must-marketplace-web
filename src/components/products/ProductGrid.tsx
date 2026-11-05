@@ -1,7 +1,8 @@
 import React from "react";
 import ProductCard from "./ProductCard";
 import { Product } from "@/types";
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, X } from "lucide-react";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface ProductGridProps {
   products: Product[];
@@ -72,25 +73,22 @@ export default function ProductGrid({
 
   if (products.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-white/60 dark:bg-slate-900/40 p-8 sm:p-12 text-center max-w-xl mx-auto my-8">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center mb-4">
-          <PackageSearch className="w-7 h-7 text-secondary" />
-        </div>
-        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">
-          {emptyTitle}
-        </h3>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-          {emptyMessage}
-        </p>
-        {onResetFilters && (
-          <button
-            onClick={onResetFilters}
-            className="px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-sm"
-          >
-            Reset All Filters
-          </button>
-        )}
-      </div>
+      <EmptyState
+        icon={<PackageSearch className="w-8 h-8" />}
+        title={emptyTitle}
+        description={emptyMessage}
+        action={
+          onResetFilters ? (
+            <button
+              onClick={onResetFilters}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset All Filters
+            </button>
+          ) : undefined
+        }
+      />
     );
   }
 

@@ -38,6 +38,7 @@ import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import { formatRelativeTime, formatPrice, getInitials, isAdministratorEmail } from "@/lib/utils";
 import { Product, User } from "@/types";
+import EmptyState from "@/components/ui/EmptyState";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ export default function AdminPage() {
   // Search/filter
   const [productSearch, setProductSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState<"all" | "sellers" | "buyers">("all");
 
   // Delete confirmation
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
@@ -251,13 +253,19 @@ export default function AdminPage() {
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.toLowerCase();
-    return users.filter(
-      (u) =>
+    return users.filter((u) => {
+      const matchesSearch =
         !q ||
         u.fullName?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q)
-    );
-  }, [users, userSearch]);
+        u.email?.toLowerCase().includes(q);
+      const isSeller = u.seller || u.isSeller;
+      const matchesRole =
+        userRoleFilter === "all" ||
+        (userRoleFilter === "sellers" && isSeller) ||
+        (userRoleFilter === "buyers" && !isSeller);
+      return matchesSearch && matchesRole;
+    });
+  }, [users, userSearch, userRoleFilter]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleDeleteProduct = async (productId: string) => {
@@ -571,7 +579,26 @@ export default function AdminPage() {
               <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-sm">No products found.</div>
+            <EmptyState
+              icon={<Package className="w-8 h-8" />}
+              title={productSearch ? "No products match your search" : "No listings yet"}
+              description={
+                productSearch
+                  ? `No products found for "${productSearch}". Try a different title, seller or category.`
+                  : "No products have been listed yet. Sellers will appear here once they post their first ad."
+              }
+              action={
+                productSearch ? (
+                  <button
+                    onClick={() => setProductSearch("")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear search
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="space-y-2">
               {filteredProducts.map((p) => (
@@ -676,13 +703,67 @@ export default function AdminPage() {
             )}
           </div>
 
+          {/* Role filter tabs */}
+          <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs font-semibold w-fit">
+            {(
+              [
+                { key: "all" as const, label: `All Accounts (${users.length})` },
+                { key: "sellers" as const, label: `Sellers (${users.filter((u) => u.seller || u.isSeller).length})` },
+                { key: "buyers" as const, label: `Buyers Only (${users.filter((u) => !(u.seller || u.isSeller)).length})` },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setUserRoleFilter(f.key)}
+                className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+                  userRoleFilter === f.key
+                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           {/* Users list */}
           {loadingData ? (
             <div className="flex justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 text-sm">No users found.</div>
+            <EmptyState
+              icon={<Users className="w-8 h-8" />}
+              title={
+                userSearch
+                  ? "No users match your search"
+                  : userRoleFilter === "sellers"
+                  ? "No sellers yet"
+                  : userRoleFilter === "buyers"
+                  ? "No buyers yet"
+                  : "No users yet"
+              }
+              description={
+                userSearch
+                  ? `No accounts found for "${userSearch}". Try a different name or email.`
+                  : userRoleFilter === "sellers"
+                  ? "No seller accounts found. Users who activate seller mode will appear here."
+                  : userRoleFilter === "buyers"
+                  ? "No buyer-only accounts yet. All registered users who aren't sellers will appear here."
+                  : "No user accounts have registered yet. They'll appear here once students sign up."
+              }
+              action={
+                userSearch || userRoleFilter !== "all" ? (
+                  <button
+                    onClick={() => { setUserSearch(""); setUserRoleFilter("all"); }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear filters
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="space-y-2">
               {filteredUsers.map((u) => (

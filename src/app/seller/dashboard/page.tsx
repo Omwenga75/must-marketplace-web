@@ -27,6 +27,7 @@ import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
+import EmptyState from "@/components/ui/EmptyState";
 
 export default function SellerDashboardPage() {
   const router = useRouter();
@@ -432,22 +433,34 @@ export default function SellerDashboardPage() {
             ))}
           </div>
         ) : displayedListings.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 space-y-3">
-            <AlertCircle className="w-10 h-10 text-slate-400 mx-auto" />
-            <h3 className="font-bold text-base text-slate-900 dark:text-white">
-              No listings in this tab
-            </h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Ready to post something? Tap the button below to reach students on campus.
-            </p>
-            <Link
-              href="/seller/products/new"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span>Post Your First Ad</span>
-            </Link>
-          </div>
+          <EmptyState
+            icon={
+              filterTab === "SOLD"
+                ? <CheckCircle2 className="w-8 h-8" />
+                : <Package className="w-8 h-8" />
+            }
+            title={
+              filterTab === "SOLD"
+                ? "No sold items yet"
+                : filterTab === "ACTIVE"
+                ? "No active listings"
+                : "No listings yet"
+            }
+            description={
+              filterTab === "SOLD"
+                ? "Items you've marked as sold will appear here. Keep selling!"
+                : "You haven't posted any ads yet. Start by listing something you want to sell on campus."
+            }
+            action={
+              <Link
+                href="/seller/products/new"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Post Your First Ad
+              </Link>
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayedListings.map((prod) => (
