@@ -24,6 +24,8 @@ import {
   UserCheck,
   Store,
   RefreshCw,
+  PackageSearch,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -98,6 +100,7 @@ export default function AdminPage() {
 
   // Search/filter
   const [productSearch, setProductSearch] = useState("");
+  const [productStatusFilter, setProductStatusFilter] = useState<"all" | "active" | "sold">("all");
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<"all" | "sellers" | "buyers">("all");
 
@@ -242,14 +245,22 @@ export default function AdminPage() {
   // ── Filtered lists ─────────────────────────────────────────────────────────
   const filteredProducts = useMemo(() => {
     const q = productSearch.toLowerCase();
-    return products.filter(
-      (p) =>
+    return products.filter((p) => {
+      const matchesSearch =
         !q ||
         p.title?.toLowerCase().includes(q) ||
         p.sellerName?.toLowerCase().includes(q) ||
-        p.category?.name?.toLowerCase().includes(q)
-    );
-  }, [products, productSearch]);
+        p.category?.name?.toLowerCase().includes(q);
+
+      const status = (p.status || "ACTIVE").toUpperCase();
+      const matchesStatus =
+        productStatusFilter === "all" ||
+        (productStatusFilter === "active" && status === "ACTIVE") ||
+        (productStatusFilter === "sold" && status === "SOLD");
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [products, productSearch, productStatusFilter]);
 
   const filteredUsers = useMemo(() => {
     const q = userSearch.toLowerCase();
@@ -359,7 +370,7 @@ export default function AdminPage() {
 
   const tabs: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Overview", icon: <BarChart3 className="w-4 h-4" /> },
-    { id: "products", label: `Products (${products.length})`, icon: <Package className="w-4 h-4" /> },
+    { id: "products", label: `Listings (${products.length})`, icon: <Package className="w-4 h-4" /> },
     { id: "users", label: `Users (${users.length})`, icon: <Users className="w-4 h-4" /> },
     { id: "broadcast", label: "Broadcast", icon: <Megaphone className="w-4 h-4" /> },
   ];
@@ -484,7 +495,15 @@ export default function AdminPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
               </div>
             ) : activityEvents.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 text-sm">No activity yet.</div>
+              <div className="py-12 px-6 flex flex-col items-center justify-center text-center space-y-2">
+                <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-slate-500 mb-1">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-300">No Recent Activity Recorded</p>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  New student registrations, product listings, and campus sales will stream here automatically.
+                </p>
+              </div>
             ) : (
               <div className="divide-y divide-slate-800/60">
                 {paginatedActivity.map((event) => {
@@ -549,56 +568,151 @@ export default function AdminPage() {
       )}
 
       {/* ══════════════════════════════════════════════
-          PRODUCTS TAB
+          PRODUCTS / LISTINGS TAB
       ══════════════════════════════════════════════ */}
       {activeTab === "products" && (
         <div className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
-              placeholder="Search by title, seller or category…"
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-            />
-            {productSearch && (
-              <button
-                onClick={() => setProductSearch("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          {/* Controls: Search and Status Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search by title, seller or category…"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              />
+              {productSearch && (
+                <button
+                  onClick={() => setProductSearch("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter Tabs (All / Active / Sold) */}
+            <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs font-semibold self-start sm:self-auto shrink-0">
+              {(
+                [
+                  { key: "all" as const, label: `All (${products.length})` },
+                  { key: "active" as const, label: `Active (${activeProducts.length})` },
+                  { key: "sold" as const, label: `Sold (${soldProducts.length})` },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setProductStatusFilter(f.key)}
+                  className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                    productStatusFilter === f.key
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Table Header Bar when listings exist */}
+          {filteredProducts.length > 0 && !loadingData && (
+            <div className="hidden md:flex items-center justify-between px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center gap-4 flex-1">
+                <span className="w-12 text-center">Thumbnail</span>
+                <span>Listing Details</span>
+              </div>
+              <div className="w-48 text-left">Seller &amp; Price</div>
+              <div className="w-28 text-center">Status</div>
+              <div className="w-20 text-right">Actions</div>
+            </div>
+          )}
 
           {/* Products list */}
           {loadingData ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-7 h-7 animate-spin text-emerald-500" />
             </div>
           ) : filteredProducts.length === 0 ? (
-            <EmptyState
-              icon={<Package className="w-8 h-8" />}
-              title={productSearch ? "No products match your search" : "No listings yet"}
-              description={
-                productSearch
-                  ? `No products found for "${productSearch}". Try a different title, seller or category.`
-                  : "No products have been listed yet. Sellers will appear here once they post their first ad."
-              }
-              action={
-                productSearch ? (
+            productSearch.trim().length > 0 || productStatusFilter !== "all" ? (
+              <EmptyState
+                variant="card"
+                colorScheme="amber"
+                icon={<PackageSearch className="w-8 h-8" />}
+                badge="Search & Filter Active"
+                title={
+                  productSearch.trim().length > 0
+                    ? `No listings matching "${productSearch}"`
+                    : `No ${productStatusFilter} listings found`
+                }
+                description={
+                  productSearch.trim().length > 0
+                    ? `We couldn't find any marketplace items matching "${productSearch}" with the current filters. Try adjusting your query or resetting filters.`
+                    : `There are currently no listings categorized as "${productStatusFilter.toUpperCase()}". Switch to "All" or "Active" to browse other ads.`
+                }
+                hints={[
+                  "Try searching by broader keywords or brand (e.g. 'Laptop', 'Calculus', 'Hostel')",
+                  "Search by student seller name or campus location",
+                  "Toggle between All, Active, and Sold filters",
+                ]}
+                action={
                   <button
-                    onClick={() => setProductSearch("")}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    onClick={() => {
+                      setProductSearch("");
+                      setProductStatusFilter("all");
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 shadow-md transition-all cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
-                    Clear search
+                    Reset Search &amp; Filters
                   </button>
-                ) : undefined
-              }
-            />
+                }
+                secondaryAction={
+                  <button
+                    onClick={loadData}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
+                    Refresh Feed
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState
+                variant="card"
+                colorScheme="emerald"
+                icon={<Package className="w-8 h-8" />}
+                badge="Campus Marketplace · 0 Listings"
+                title="No Campus Listings Yet"
+                description="The MUST Marketplace currently has no active or archived listings. Once students post advertisements for textbooks, electronics, or campus services, they will appear here in real-time."
+                hints={[
+                  "Listings posted by students synchronize automatically via Firebase Realtime Database",
+                  "Admins can review, inspect, or delete any listing with one click",
+                  "Broadcast an announcement to encourage students to post their first ad",
+                ]}
+                action={
+                  <Link
+                    href="/seller/products/new"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create New Listing
+                  </Link>
+                }
+                secondaryAction={
+                  <button
+                    onClick={() => setActiveTab("broadcast")}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  >
+                    <Megaphone className="w-3.5 h-3.5 text-orange-500" />
+                    Notify Students
+                  </button>
+                }
+              />
+            )
           ) : (
             <div className="space-y-2">
               {filteredProducts.map((p) => (
@@ -683,87 +797,147 @@ export default function AdminPage() {
       ══════════════════════════════════════════════ */}
       {activeTab === "users" && (
         <div className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Search by name or email…"
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-            />
-            {userSearch && (
-              <button
-                onClick={() => setUserSearch("")}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          {/* Controls: Search and Role Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Search by name or email…"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              />
+              {userSearch && (
+                <button
+                  onClick={() => setUserSearch("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Role filter tabs */}
+            <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs font-semibold self-start sm:self-auto shrink-0">
+              {(
+                [
+                  { key: "all" as const, label: `All (${users.length})` },
+                  { key: "sellers" as const, label: `Sellers (${users.filter((u) => u.seller || u.isSeller).length})` },
+                  { key: "buyers" as const, label: `Buyers (${users.filter((u) => !(u.seller || u.isSeller)).length})` },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setUserRoleFilter(f.key)}
+                  className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all cursor-pointer ${
+                    userRoleFilter === f.key
+                      ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Role filter tabs */}
-          <div className="flex gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs font-semibold w-fit">
-            {(
-              [
-                { key: "all" as const, label: `All Accounts (${users.length})` },
-                { key: "sellers" as const, label: `Sellers (${users.filter((u) => u.seller || u.isSeller).length})` },
-                { key: "buyers" as const, label: `Buyers Only (${users.filter((u) => !(u.seller || u.isSeller)).length})` },
-              ] as const
-            ).map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setUserRoleFilter(f.key)}
-                className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-all ${
-                  userRoleFilter === f.key
-                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          {/* Table Header Bar when users exist */}
+          {filteredUsers.length > 0 && !loadingData && (
+            <div className="hidden md:flex items-center justify-between px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-200/80 dark:border-slate-800">
+              <div className="flex items-center gap-4 flex-1">
+                <span className="w-10 text-center">User</span>
+                <span>Name &amp; Contact</span>
+              </div>
+              <div className="w-36 text-left">Role</div>
+              <div className="w-44 text-left">Activity / Member Since</div>
+              <div className="w-20 text-right">Actions</div>
+            </div>
+          )}
 
           {/* Users list */}
           {loadingData ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-7 h-7 animate-spin text-emerald-500" />
             </div>
           ) : filteredUsers.length === 0 ? (
-            <EmptyState
-              icon={<Users className="w-8 h-8" />}
-              title={
-                userSearch
-                  ? "No users match your search"
-                  : userRoleFilter === "sellers"
-                  ? "No sellers yet"
-                  : userRoleFilter === "buyers"
-                  ? "No buyers yet"
-                  : "No users yet"
-              }
-              description={
-                userSearch
-                  ? `No accounts found for "${userSearch}". Try a different name or email.`
-                  : userRoleFilter === "sellers"
-                  ? "No seller accounts found. Users who activate seller mode will appear here."
-                  : userRoleFilter === "buyers"
-                  ? "No buyer-only accounts yet. All registered users who aren't sellers will appear here."
-                  : "No user accounts have registered yet. They'll appear here once students sign up."
-              }
-              action={
-                userSearch || userRoleFilter !== "all" ? (
+            userSearch.trim().length > 0 || userRoleFilter !== "all" ? (
+              <EmptyState
+                variant="card"
+                colorScheme="amber"
+                icon={<UserX className="w-8 h-8" />}
+                badge="Search & Filter Active"
+                title={
+                  userSearch.trim().length > 0
+                    ? `No users matching "${userSearch}"`
+                    : `No ${userRoleFilter === "sellers" ? "seller" : "buyer"} accounts found`
+                }
+                description={
+                  userSearch.trim().length > 0
+                    ? `No campus accounts matched your query "${userSearch}". Try searching by university email (@must.ac.ke) or clearing active filters.`
+                    : `There are currently no accounts matching the "${userRoleFilter}" role filter. Switch back to "All" to browse all registered students.`
+                }
+                hints={[
+                  "Search by student full name or student ID",
+                  "Search by university email domain (e.g. '@must.ac.ke')",
+                  "Toggle between All, Sellers, and Buyers Only filters above",
+                ]}
+                action={
                   <button
-                    onClick={() => { setUserSearch(""); setUserRoleFilter("all"); }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    onClick={() => {
+                      setUserSearch("");
+                      setUserRoleFilter("all");
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-100 shadow-md transition-all cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
-                    Clear filters
+                    Reset Search &amp; Filters
                   </button>
-                ) : undefined
-              }
-            />
+                }
+                secondaryAction={
+                  <button
+                    onClick={loadData}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
+                    Refresh Directory
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState
+                variant="card"
+                colorScheme="indigo"
+                icon={<Users className="w-8 h-8" />}
+                badge="Student Directory · 0 Accounts"
+                title="No Registered Users Yet"
+                description="No student or seller accounts have been registered on MUST Marketplace yet. As students sign in or create accounts, their profiles, roles, and campus sales history will be cataloged here automatically."
+                hints={[
+                  "New student accounts are synced automatically from Firebase Authentication",
+                  "Sellers are automatically badged when they activate their seller profile",
+                  "Send a campus-wide broadcast to invite students to join the community",
+                ]}
+                action={
+                  <button
+                    onClick={() => setActiveTab("broadcast")}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold shadow-md shadow-orange-500/20 transition-all cursor-pointer"
+                  >
+                    <Megaphone className="w-3.5 h-3.5" />
+                    Send Campus Broadcast
+                  </button>
+                }
+                secondaryAction={
+                  <button
+                    onClick={loadData}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
+                    Refresh Directory
+                  </button>
+                }
+              />
+            )
           ) : (
             <div className="space-y-2">
               {filteredUsers.map((u) => (
