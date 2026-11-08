@@ -682,7 +682,8 @@ export default function AdminPage() {
               />
             ) : (
               <EmptyState
-                variant="card"
+                variant="default"
+                fullPage={true}
                 colorScheme="emerald"
                 title="No Campus Listings Yet"
                 description="No products or services have been listed for sale on MUST Marketplace yet. When student sellers create listings, they will appear here in real-time."
@@ -882,7 +883,8 @@ export default function AdminPage() {
               />
             ) : (
               <EmptyState
-                variant="card"
+                variant="default"
+                fullPage={true}
                 colorScheme="indigo"
                 title="No Registered Users Yet"
                 description="No student or campus accounts have registered yet. As students sign in, list items, and engage, their accounts and activity will show up here."
