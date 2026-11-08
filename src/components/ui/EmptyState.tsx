@@ -11,7 +11,7 @@ export type EmptyStateColorScheme =
   | "slate";
 
 export interface EmptyStateProps {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   title: string;
   description: string;
   action?: React.ReactNode;
@@ -165,24 +165,26 @@ export default function EmptyState({
       )}
 
       {/* Layered Icon with ambient depth */}
-      <div className="relative mb-6 z-10">
-        {/* Soft background glow */}
-        <div
-          className={`absolute inset-0 rounded-full blur-2xl scale-150 pointer-events-none opacity-60 bg-gradient-to-tr ${cfg.glow}`}
-        />
-
-        {/* Outer decorative ring */}
-        <div
-          className={`relative p-2.5 sm:p-3 rounded-3xl border shadow-sm backdrop-blur-xs transition-transform duration-300 hover:scale-105 ${cfg.iconRing}`}
-        >
-          {/* Inner vibrant icon bubble */}
+      {icon && (
+        <div className="relative mb-6 z-10">
+          {/* Soft background glow */}
           <div
-            className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border flex items-center justify-center shadow-md ${cfg.iconBg} ${cfg.iconBorder} ${cfg.iconText}`}
+            className={`absolute inset-0 rounded-full blur-2xl scale-150 pointer-events-none opacity-60 bg-gradient-to-tr ${cfg.glow}`}
+          />
+
+          {/* Outer decorative ring */}
+          <div
+            className={`relative p-2.5 sm:p-3 rounded-3xl border shadow-sm backdrop-blur-xs transition-transform duration-300 hover:scale-105 ${cfg.iconRing}`}
           >
-            {icon}
+            {/* Inner vibrant icon bubble */}
+            <div
+              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border flex items-center justify-center shadow-md ${cfg.iconBg} ${cfg.iconBorder} ${cfg.iconText}`}
+            >
+              {icon}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Title & Description */}
       <div className="relative z-10 max-w-lg space-y-2 mb-2">

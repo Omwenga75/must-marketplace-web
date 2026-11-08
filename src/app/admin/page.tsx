@@ -684,33 +684,8 @@ export default function AdminPage() {
               <EmptyState
                 variant="card"
                 colorScheme="emerald"
-                icon={<Package className="w-8 h-8" />}
-                badge="Campus Marketplace · 0 Listings"
                 title="No Campus Listings Yet"
-                description="The MUST Marketplace currently has no active or archived listings. Once students post advertisements for textbooks, electronics, or campus services, they will appear here in real-time."
-                hints={[
-                  "Listings posted by students synchronize automatically via Firebase Realtime Database",
-                  "Admins can review, inspect, or delete any listing with one click",
-                  "Broadcast an announcement to encourage students to post their first ad",
-                ]}
-                action={
-                  <Link
-                    href="/seller/products/new"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Create New Listing
-                  </Link>
-                }
-                secondaryAction={
-                  <button
-                    onClick={() => setActiveTab("broadcast")}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
-                  >
-                    <Megaphone className="w-3.5 h-3.5 text-orange-500" />
-                    Notify Students
-                  </button>
-                }
+                description="No products or services have been listed for sale on MUST Marketplace yet. When student sellers create listings, they will appear here in real-time."
               />
             )
           ) : (
@@ -909,33 +884,8 @@ export default function AdminPage() {
               <EmptyState
                 variant="card"
                 colorScheme="indigo"
-                icon={<Users className="w-8 h-8" />}
-                badge="Student Directory · 0 Accounts"
                 title="No Registered Users Yet"
-                description="No student or seller accounts have been registered on MUST Marketplace yet. As students sign in or create accounts, their profiles, roles, and campus sales history will be cataloged here automatically."
-                hints={[
-                  "New student accounts are synced automatically from Firebase Authentication",
-                  "Sellers are automatically badged when they activate their seller profile",
-                  "Send a campus-wide broadcast to invite students to join the community",
-                ]}
-                action={
-                  <button
-                    onClick={() => setActiveTab("broadcast")}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold shadow-md shadow-orange-500/20 transition-all cursor-pointer"
-                  >
-                    <Megaphone className="w-3.5 h-3.5" />
-                    Send Campus Broadcast
-                  </button>
-                }
-                secondaryAction={
-                  <button
-                    onClick={loadData}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
-                    Refresh Directory
-                  </button>
-                }
+                description="No student or campus accounts have registered yet. As students sign in, list items, and engage, their accounts and activity will show up here."
               />
             )
           ) : (
