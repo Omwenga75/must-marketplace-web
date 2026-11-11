@@ -187,7 +187,7 @@ function userHasListings(user: Partial<User>, products: Product[]): boolean {
 
 // ── Route handlers ───────────────────────────────────────────────────────────
 
-// GET /api/users?email=...&id=...
+// GET /api/users?email=...&id=...&count=1
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const emailParam = searchParams.get("email")?.toLowerCase().trim();
@@ -199,6 +199,23 @@ export async function GET(req: Request) {
     return NextResponse.json(deletedArr, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
+  }
+
+  // ?count=1 — return just the Firebase RTDB user count (same source as admin panel)
+  if (searchParams.get("count") === "1") {
+    try {
+      const fbUsers = await getFirebaseUsers();
+      const count = fbUsers.filter(
+        (u) => u && u.id && !deletedSet.has(u.id) && !deletedSet.has(u.email)
+      ).length;
+      return NextResponse.json({ count }, {
+        headers: { "Cache-Control": "no-store, max-age=0" },
+      });
+    } catch {
+      return NextResponse.json({ count: 0 }, {
+        headers: { "Cache-Control": "no-store, max-age=0" },
+      });
+    }
   }
 
   // Check specific user direct from Firebase first

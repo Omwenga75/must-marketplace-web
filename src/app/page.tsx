@@ -72,16 +72,13 @@ export default function HomePage() {
         setLoading(false);
       });
 
-    // Fetch registered users count for the hero highlights
-    fetch("/api/users")
+    // Fetch registered users count — use Firebase RTDB count (same source as admin panel)
+    fetch("/api/users?count=1")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          setUserCount(data.length);
-          try { sessionStorage.setItem("must_cached_user_count", String(data.length)); } catch {}
-        } else {
-          setUserCount(0);
-        }
+        const count = typeof data?.count === "number" ? data.count : 0;
+        setUserCount(count);
+        try { sessionStorage.setItem("must_cached_user_count", String(count)); } catch {}
       })
       .catch(() => {
         setUserCount((prev) => prev ?? 0);
