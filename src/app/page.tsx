@@ -48,6 +48,7 @@ export default function HomePage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetchProducts()
@@ -58,6 +59,16 @@ export default function HomePage() {
       .catch(() => {
         setLoading(false);
       });
+
+    // Fetch registered users count for the hero highlights
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setUserCount(data.length);
+        }
+      })
+      .catch(() => {});
 
     // Real-time Firebase listener so homepage updates LIVE when items are liked or viewed
     let unsubDb: (() => void) | null = null;
@@ -99,6 +110,7 @@ export default function HomePage() {
 
     // Cross-tab BroadcastChannel
     let bc: BroadcastChannel | null = null;
+    let userBc: BroadcastChannel | null = null;
     if (typeof BroadcastChannel !== "undefined") {
       bc = new BroadcastChannel("must_marketplace_products_sync");
       bc.onmessage = (event) => {
@@ -109,6 +121,18 @@ export default function HomePage() {
           setProducts((prev) => [prod, ...prev.filter((p) => p.id !== prod.id)]);
         }
       };
+
+      try {
+        userBc = new BroadcastChannel("must_marketplace_users_sync");
+        userBc.onmessage = () => {
+          fetch("/api/users")
+            .then((res) => res.json())
+            .then((data) => {
+              if (Array.isArray(data)) setUserCount(data.length);
+            })
+            .catch(() => {});
+        };
+      } catch {}
     }
 
     // Cross-window storage event
@@ -128,6 +152,7 @@ export default function HomePage() {
       window.removeEventListener("must_product_created", onProductCreated);
       window.removeEventListener("storage", onStorage);
       if (bc) bc.close();
+      if (userBc) userBc.close();
     };
   }, []);
 
@@ -214,10 +239,10 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
-                    KSh 0
+                    {userCount !== null && userCount > 50 ? `${userCount}+` : "50+"}
                   </p>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Listing Commission
+                    Registered Users
                   </p>
                 </div>
                 <div className="space-y-0.5">
