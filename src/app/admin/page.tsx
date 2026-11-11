@@ -571,7 +571,7 @@ export default function AdminPage() {
           PRODUCTS / LISTINGS TAB
       ══════════════════════════════════════════════ */}
       {activeTab === "products" && (
-        <div className="space-y-4">
+        <div className={!loadingData && filteredProducts.length === 0 && productSearch.trim().length === 0 && productStatusFilter === "all" ? "flex flex-col flex-1 min-h-[calc(100dvh-14rem)]" : "space-y-4"}>
           {/* Controls: Search and Status Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search */}
@@ -772,7 +772,7 @@ export default function AdminPage() {
           USERS TAB
       ══════════════════════════════════════════════ */}
       {activeTab === "users" && (
-        <div className="space-y-4">
+        <div className={!loadingData && filteredUsers.length === 0 && userSearch.trim().length === 0 && userRoleFilter === "all" ? "flex flex-col flex-1 min-h-[calc(100dvh-14rem)]" : "space-y-4"}>
           {/* Controls: Search and Role Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search */}
