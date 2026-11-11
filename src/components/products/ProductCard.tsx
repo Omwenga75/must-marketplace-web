@@ -134,10 +134,39 @@ export default function ProductCard({ product }: ProductCardProps) {
   const rawTitle = product.title || "";
   const displayTitle = rawTitle.length > 18 ? rawTitle.slice(0, 18).trim() : rawTitle;
 
+  // Resolve fresh authoritative phone before saving for handoff
+  const getFreshSellerPhone = (): string => {
+    if (typeof window !== "undefined") {
+      try {
+        if (
+          user &&
+          (user.id === product.sellerId ||
+            (product.sellerName && user.fullName === product.sellerName)) &&
+          user.phone
+        ) {
+          return user.phone;
+        }
+        if (product.sellerId) {
+          const byId = localStorage.getItem(`must_seller_phone_${product.sellerId}`);
+          if (byId) return byId;
+        }
+        if (product.sellerName) {
+          const byName = localStorage.getItem(
+            `must_seller_phone_for_${product.sellerName.toLowerCase().trim()}`
+          );
+          if (byName) return byName;
+        }
+      } catch {}
+    }
+    return product.sellerPhone || "";
+  };
+
   // Save product data into sessionStorage so the detail page can render instantly (0ms skeleton)
   const saveForHandoff = () => {
     try {
-      sessionStorage.setItem(`must_item_${product.id}`, JSON.stringify(product));
+      const freshPhone = getFreshSellerPhone();
+      const productToSave = freshPhone ? { ...product, sellerPhone: freshPhone } : product;
+      sessionStorage.setItem(`must_item_${product.id}`, JSON.stringify(productToSave));
     } catch {}
   };
 

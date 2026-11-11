@@ -173,8 +173,26 @@ export default function ProductDetailPage() {
       if (handoff) {
         const parsed = JSON.parse(handoff);
         if (parsed?.id === productId) {
-          setProduct(parsed);
-          document.title = `${parsed.title} | Ksh ${parsed.price}`;
+          let freshPhone = parsed.sellerPhone;
+          if (typeof window !== "undefined") {
+            try {
+              if (user && (user.id === parsed.sellerId || (parsed.sellerName && user.fullName === parsed.sellerName)) && user.phone) {
+                freshPhone = user.phone;
+              } else {
+                if (parsed.sellerId) {
+                  const byId = localStorage.getItem(`must_seller_phone_${parsed.sellerId}`);
+                  if (byId) freshPhone = byId;
+                }
+                if (parsed.sellerName) {
+                  const byName = localStorage.getItem(`must_seller_phone_for_${parsed.sellerName.toLowerCase().trim()}`);
+                  if (byName) freshPhone = byName;
+                }
+              }
+            } catch {}
+          }
+          const freshParsed = freshPhone ? { ...parsed, sellerPhone: freshPhone } : parsed;
+          setProduct(freshParsed);
+          document.title = `${freshParsed.title} | Ksh ${freshParsed.price}`;
           setLoading(false);
           resolvedInstantly = true;
         }
@@ -184,8 +202,26 @@ export default function ProductDetailPage() {
     if (!resolvedInstantly) {
       const cached = getLocalStoredProducts().find((p) => p.id === productId);
       if (cached) {
-        setProduct(cached);
-        document.title = `${cached.title} | Ksh ${cached.price}`;
+        let freshPhone = cached.sellerPhone;
+        if (typeof window !== "undefined") {
+          try {
+            if (user && (user.id === cached.sellerId || (cached.sellerName && user.fullName === cached.sellerName)) && user.phone) {
+              freshPhone = user.phone;
+            } else {
+              if (cached.sellerId) {
+                const byId = localStorage.getItem(`must_seller_phone_${cached.sellerId}`);
+                if (byId) freshPhone = byId;
+              }
+              if (cached.sellerName) {
+                const byName = localStorage.getItem(`must_seller_phone_for_${cached.sellerName.toLowerCase().trim()}`);
+                if (byName) freshPhone = byName;
+              }
+            }
+          } catch {}
+        }
+        const freshCached = freshPhone ? { ...cached, sellerPhone: freshPhone } : cached;
+        setProduct(freshCached);
+        document.title = `${freshCached.title} | Ksh ${freshCached.price}`;
         setLoading(false);
         resolvedInstantly = true;
       }
@@ -511,10 +547,30 @@ export default function ProductDetailPage() {
             ) : (
               <div className="space-y-3">
                 {(() => {
-                  const effectivePhone =
-                    (user && (user.id === product.sellerId || (product.sellerName && user.fullName === product.sellerName)) && user.phone)
-                      ? user.phone
-                      : (product.sellerPhone || "");
+                  let effectivePhone = product.sellerPhone || "";
+                  if (typeof window !== "undefined") {
+                    try {
+                      if (
+                        user &&
+                        (user.id === product.sellerId ||
+                          (product.sellerName && user.fullName === product.sellerName)) &&
+                        user.phone
+                      ) {
+                        effectivePhone = user.phone;
+                      } else {
+                        if (product.sellerId) {
+                          const byId = localStorage.getItem(`must_seller_phone_${product.sellerId}`);
+                          if (byId) effectivePhone = byId;
+                        }
+                        if (product.sellerName) {
+                          const byName = localStorage.getItem(
+                            `must_seller_phone_for_${product.sellerName.toLowerCase().trim()}`
+                          );
+                          if (byName) effectivePhone = byName;
+                        }
+                      }
+                    } catch {}
+                  }
                   const rawPhone = effectivePhone;
                   let cleanDigits = rawPhone.replace(/[^0-9]/g, "");
                   if (cleanDigits.startsWith("0") && cleanDigits.length === 10) {

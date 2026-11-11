@@ -220,10 +220,26 @@ export function getLocalStoredProducts(): Product[] {
               !deleted.has(item.id) &&
               !item.id.startsWith("prod-")
           )
-          .map((item) => ({
-            ...item,
-            likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
-          }));
+          .map((item) => {
+            let phone = item.sellerPhone;
+            try {
+              if (item.sellerId) {
+                const byId = localStorage.getItem(`must_seller_phone_${item.sellerId}`);
+                if (byId) phone = byId;
+              }
+              if (item.sellerName) {
+                const byName = localStorage.getItem(
+                  `must_seller_phone_for_${item.sellerName.toLowerCase().trim()}`
+                );
+                if (byName) phone = byName;
+              }
+            } catch {}
+            return {
+              ...item,
+              sellerPhone: phone,
+              likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
+            };
+          });
       }
     }
   } catch (e) {
@@ -808,6 +824,15 @@ export async function updateSellerPhoneOnProducts(
   const cleanOldPhoneDigits = oldPhone ? oldPhone.replace(/\D/g, "") : "";
   const cleanEmail = (sellerEmail || "").toLowerCase().trim();
   const cleanName = (sellerName || "").toLowerCase().trim();
+
+  // 0. Immediately persist the phone override in localStorage for 0ms zero-latency resolution
+  if (typeof window !== "undefined") {
+    try {
+      if (sellerId) localStorage.setItem(`must_seller_phone_${sellerId}`, cleanNewPhone);
+      if (cleanName) localStorage.setItem(`must_seller_phone_for_${cleanName}`, cleanNewPhone);
+      if (cleanEmail) localStorage.setItem(`must_seller_phone_for_${cleanEmail}`, cleanNewPhone);
+    } catch {}
+  }
 
   const isMyProduct = (p: any): boolean => {
     if (!p) return false;
