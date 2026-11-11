@@ -34,8 +34,33 @@ export default function ProductDetailPage() {
   const { user, loading: authLoading } = useAuth();
   const { isFavorite, toggle } = useFavorites();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Product | null>(() => {
+    if (typeof window !== "undefined" && params.id) {
+      const id = params.id as string;
+      try {
+        const handoff = sessionStorage.getItem(`must_item_${id}`);
+        if (handoff) {
+          const parsed = JSON.parse(handoff);
+          if (parsed?.id === id) return parsed;
+        }
+        const local = getLocalStoredProducts().find((p) => p.id === id);
+        if (local) return local;
+      } catch {}
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window !== "undefined" && params.id) {
+      const id = params.id as string;
+      try {
+        const handoff = sessionStorage.getItem(`must_item_${id}`);
+        if (handoff) return false;
+        const local = getLocalStoredProducts().find((p) => p.id === id);
+        if (local) return false;
+      } catch {}
+    }
+    return true;
+  });
   const [isTogglingFav, setIsTogglingFav] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedShare, setCopiedShare] = useState(false);
@@ -124,19 +149,30 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!productId) return;
 
-    // 0. Instantly load from local cache if present (0ms on open!)
-    const cached = getLocalStoredProducts().find((p) => p.id === productId);
-    if (cached) {
-      setProduct(cached);
-      document.title = `${cached.title} | Ksh ${cached.price}`;
-      setLoading(false);
+    // 0. Instantly load from session handoff / local cache (already applied via useState lazy init)
+    // Set title if product is already populated
+    if (product) {
+      document.title = `${product.title} | Ksh ${product.price}`;
+    } else {
+      // Fallback: try cache inside effect for edge cases (e.g. SSR hydration)
+      const cached = getLocalStoredProducts().find((p) => p.id === productId);
+      if (cached) {
+        setProduct(cached);
+        document.title = `${cached.title} | Ksh ${cached.price}`;
+        setLoading(false);
+      }
     }
 
+    // Always fetch fresh data from server in background (silent revalidation)
     getProductById(productId)
       .then((data) => {
         if (data) {
           setProduct(data);
           document.title = `${data.title} | Ksh ${data.price}`;
+          // Also refresh the handoff cache with latest data
+          try {
+            sessionStorage.setItem(`must_item_${productId}`, JSON.stringify(data));
+          } catch {}
         }
         setLoading(false);
       })

@@ -312,6 +312,13 @@ export default function HomePage() {
                       <Link
                         key={item.id}
                         href={`/product/${item.id}`}
+                        prefetch={true}
+                        onClick={() => {
+                          try { sessionStorage.setItem(`must_item_${item.id}`, JSON.stringify(item)); } catch {}
+                        }}
+                        onMouseEnter={() => {
+                          try { sessionStorage.setItem(`must_item_${item.id}`, JSON.stringify(item)); } catch {}
+                        }}
                         className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
                       >
                         <img

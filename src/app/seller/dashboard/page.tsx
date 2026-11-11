@@ -542,6 +542,12 @@ export default function SellerDashboardPage() {
                     target="_blank"
                     className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
                     title="View live page"
+                    onClick={() => {
+                      try { sessionStorage.setItem(`must_item_${prod.id}`, JSON.stringify(prod)); } catch {}
+                    }}
+                    onMouseEnter={() => {
+                      try { sessionStorage.setItem(`must_item_${prod.id}`, JSON.stringify(prod)); } catch {}
+                    }}
                   >
                     <ExternalLink className="w-4 h-4" />
                   </Link>

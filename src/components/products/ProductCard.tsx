@@ -134,11 +134,32 @@ export default function ProductCard({ product }: ProductCardProps) {
   const rawTitle = product.title || "";
   const displayTitle = rawTitle.length > 18 ? rawTitle.slice(0, 18).trim() : rawTitle;
 
+  // Save product data into sessionStorage so the detail page can render instantly (0ms skeleton)
+  const saveForHandoff = () => {
+    try {
+      sessionStorage.setItem(`must_item_${product.id}`, JSON.stringify(product));
+    } catch {}
+  };
+
+  const handlePrefetch = () => {
+    try {
+      router.prefetch(`/product/${product.id}`);
+      saveForHandoff();
+    } catch {}
+  };
+
   return (
     <div className="group relative flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-card hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200">
       {/* Classic Square Thumbnail */}
       <div className="relative aspect-square w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-        <Link href={`/product/${product.id}`} className="block w-full h-full">
+        <Link
+          href={`/product/${product.id}`}
+          className="block w-full h-full"
+          prefetch={true}
+          onClick={saveForHandoff}
+          onMouseEnter={handlePrefetch}
+          onTouchStart={handlePrefetch}
+        >
           <img
             src={imgSrc}
             alt={product.title}
@@ -236,6 +257,10 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Link
           href={`/product/${product.id}`}
           title={product.title}
+          prefetch={true}
+          onClick={saveForHandoff}
+          onMouseEnter={handlePrefetch}
+          onTouchStart={handlePrefetch}
           className="group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors block mt-0.5"
         >
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 min-w-0">
