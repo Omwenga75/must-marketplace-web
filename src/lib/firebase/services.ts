@@ -792,89 +792,161 @@ export async function updateProduct(productId: string, updates: Partial<Product>
 
 /**
  * When a seller updates their phone number, propagate the new sellerPhone
- * to ALL their product listings (localStorage + server API + Firebase RTDB).
- * sellerId can be the user's id or email (used to match products).
+ * to ALL their product listings (localStorage + sessionStorage + server API + Firebase RTDB).
+ * Matches by sellerId, email, sellerName, or previous phone number.
  */
 export async function updateSellerPhoneOnProducts(
   sellerId: string,
   sellerEmail: string | null | undefined,
-  newPhone: string
+  sellerName: string | null | undefined,
+  newPhone: string,
+  oldPhone?: string | null
 ): Promise<void> {
-  if (!sellerId || !newPhone) return;
+  if (!newPhone) return;
 
-  // 1. Update local cache
+  const cleanNewPhone = newPhone.trim();
+  const cleanOldPhoneDigits = oldPhone ? oldPhone.replace(/\D/g, "") : "";
+  const cleanEmail = (sellerEmail || "").toLowerCase().trim();
+  const cleanName = (sellerName || "").toLowerCase().trim();
+
+  const isMyProduct = (p: any): boolean => {
+    if (!p) return false;
+    // 1. sellerId match (including potential u_ prefix)
+    if (sellerId) {
+      if (
+        p.sellerId === sellerId ||
+        p.sellerId === `u_${sellerId}` ||
+        sellerId === `u_${p.sellerId}`
+      ) {
+        return true;
+      }
+    }
+    // 2. sellerEmail match
+    if (cleanEmail && p.sellerId && p.sellerId.toLowerCase() === cleanEmail) {
+      return true;
+    }
+    // 3. sellerName match (e.g. "Joseph Muimi")
+    if (cleanName && p.sellerName && p.sellerName.trim().toLowerCase() === cleanName) {
+      return true;
+    }
+    // 4. Old phone match
+    if (cleanOldPhoneDigits && cleanOldPhoneDigits.length >= 9 && p.sellerPhone) {
+      const pDigits = p.sellerPhone.replace(/\D/g, "");
+      if (
+        pDigits === cleanOldPhoneDigits ||
+        pDigits.endsWith(cleanOldPhoneDigits.slice(-9)) ||
+        cleanOldPhoneDigits.endsWith(pDigits.slice(-9))
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // 1. Update local storage products cache
   const local = getLocalStoredProducts();
-  const toUpdate: string[] = [];
+  const toUpdateIds: string[] = [];
   const updated = local.map((p) => {
-    const owned =
-      p.sellerId === sellerId ||
-      (sellerEmail && p.sellerId?.toLowerCase() === sellerEmail.toLowerCase()) ||
-      (sellerEmail && p.sellerPhone && false); // identity match only
-    if (owned) {
-      toUpdate.push(p.id);
-      return { ...p, sellerPhone: newPhone };
+    if (isMyProduct(p)) {
+      toUpdateIds.push(p.id);
+      return { ...p, sellerPhone: cleanNewPhone };
     }
     return p;
   });
-  if (toUpdate.length > 0) setLocalStoredProducts(updated);
-
-  // 2. Update each product in Firebase RTDB + server API in parallel
-  if (toUpdate.length > 0) {
-    await Promise.allSettled(
-      toUpdate.map((productId) => {
-        const tasks: Promise<any>[] = [];
-        if (typeof window !== "undefined") {
-          tasks.push(
-            fetch(`/api/products/${productId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sellerPhone: newPhone }),
-            }).catch(() => {})
-          );
-        }
-        if (database) {
-          tasks.push(
-            update(ref(database, `products/${productId}`), { sellerPhone: newPhone }).catch(() => {})
-          );
-        }
-        return Promise.allSettled(tasks);
-      })
-    );
+  if (toUpdateIds.length > 0) {
+    setLocalStoredProducts(updated);
   }
 
-  // 3. Also do a bulk Firebase RTDB query to catch any products not in local cache
-  if (database && sellerId) {
+  // 2. Update session handoff cache & emit same-tab notification
+  if (typeof window !== "undefined") {
+    toUpdateIds.forEach((id) => {
+      try {
+        const raw = sessionStorage.getItem(`must_item_${id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          sessionStorage.setItem(
+            `must_item_${id}`,
+            JSON.stringify({ ...parsed, sellerPhone: cleanNewPhone })
+          );
+        }
+      } catch {}
+      window.dispatchEvent(
+        new CustomEvent("must_product_updated", {
+          detail: { productId: id, updates: { sellerPhone: cleanNewPhone } },
+        })
+      );
+    });
+  }
+
+  // 3. Update each product in Firebase RTDB & server API
+  const updateTasks: Promise<any>[] = [];
+
+  // Update known local IDs first
+  toUpdateIds.forEach((productId) => {
+    if (typeof window !== "undefined") {
+      updateTasks.push(
+        fetch(`/api/products/${productId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sellerPhone: cleanNewPhone }),
+        }).catch(() => {})
+      );
+    }
+    if (database) {
+      updateTasks.push(
+        update(ref(database, `products/${productId}`), { sellerPhone: cleanNewPhone }).catch(() => {})
+      );
+    }
+  });
+
+  // 4. Query Firebase RTDB products to catch any not in local cache
+  if (database) {
     try {
       const snap = await get(ref(database, "products"));
       if (snap.exists()) {
         const val = snap.val();
         if (val && typeof val === "object") {
-          const firebaseTasks: Promise<any>[] = [];
           Object.entries(val).forEach(([k, v]: [string, any]) => {
             if (!v) return;
-            if (toUpdate.includes(k)) return; // already handled
-            if (
-              v.sellerId === sellerId ||
-              (sellerEmail && v.sellerId?.toLowerCase() === sellerEmail.toLowerCase())
-            ) {
-              firebaseTasks.push(
-                update(ref(database, `products/${k}`), { sellerPhone: newPhone }).catch(() => {})
+            if (isMyProduct(v) || toUpdateIds.includes(k) || (v.id && toUpdateIds.includes(v.id))) {
+              updateTasks.push(
+                update(ref(database, `products/${k}`), { sellerPhone: cleanNewPhone }).catch(() => {})
               );
               if (typeof window !== "undefined") {
-                firebaseTasks.push(
+                updateTasks.push(
                   fetch(`/api/products/${k}`, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sellerPhone: newPhone }),
+                    body: JSON.stringify({ sellerPhone: cleanNewPhone }),
                   }).catch(() => {})
+                );
+                try {
+                  const raw = sessionStorage.getItem(`must_item_${k}`);
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    sessionStorage.setItem(
+                      `must_item_${k}`,
+                      JSON.stringify({ ...parsed, sellerPhone: cleanNewPhone })
+                    );
+                  }
+                } catch {}
+                window.dispatchEvent(
+                  new CustomEvent("must_product_updated", {
+                    detail: { productId: k, updates: { sellerPhone: cleanNewPhone } },
+                  })
                 );
               }
             }
           });
-          if (firebaseTasks.length > 0) await Promise.allSettled(firebaseTasks);
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn("Firebase query products for phone update:", e);
+    }
+  }
+
+  if (updateTasks.length > 0) {
+    await Promise.allSettled(updateTasks);
   }
 }
 

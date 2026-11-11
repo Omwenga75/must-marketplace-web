@@ -49,7 +49,7 @@ export default function ProductDetailPage() {
     }
   }, [product]);
 
-  // Real-time listener for live likes & views updates
+  // Real-time listener for live likes, views & seller details updates
   useEffect(() => {
     if (!database || !productId) return;
     try {
@@ -58,11 +58,52 @@ export default function ProductDetailPage() {
         const val = snap.val();
         if (val && typeof val === "object") {
           if (typeof val.likes === "number") setLikesCount(val.likes);
-          setProduct((prev) => prev ? { ...prev, likes: val.likes, views: val.views } : prev);
+          setProduct((prev) => {
+            if (!prev) return { ...val, id: productId };
+            return {
+              ...prev,
+              ...val,
+              id: productId,
+              likes: typeof val.likes === "number" ? val.likes : prev.likes,
+              views: typeof val.views === "number" ? val.views : prev.views,
+              sellerPhone: val.sellerPhone || prev.sellerPhone,
+            };
+          });
         }
       });
       return () => unsub();
     } catch {}
+  }, [productId]);
+
+  // Real-time listener on the seller user's profile in Firebase RTDB:
+  // Whenever the seller updates their phone number in their profile,
+  // this listing automatically updates its WhatsApp and Call contact immediately!
+  useEffect(() => {
+    if (!database || !product?.sellerId) return;
+    try {
+      const sellerRef = ref(database, `users/${product.sellerId}`);
+      const unsub = onValue(sellerRef, (snap) => {
+        const u = snap.val();
+        if (u && typeof u === "object" && u.phone) {
+          setProduct((prev) => (prev && prev.sellerPhone !== u.phone ? { ...prev, sellerPhone: u.phone } : prev));
+        }
+      });
+      return () => unsub();
+    } catch {}
+  }, [product?.sellerId]);
+
+  // Listen to same-tab product updates (e.g. seller edited phone in profile)
+  useEffect(() => {
+    if (!productId) return;
+    const handleUpdated = (e: any) => {
+      if (e?.detail?.productId === productId && e.detail.updates) {
+        setProduct((prev) => (prev ? { ...prev, ...e.detail.updates } : prev));
+      }
+    };
+    window.addEventListener("must_product_updated", handleUpdated);
+    return () => {
+      window.removeEventListener("must_product_updated", handleUpdated);
+    };
   }, [productId]);
 
   useEffect(() => {
@@ -470,7 +511,11 @@ export default function ProductDetailPage() {
             ) : (
               <div className="space-y-3">
                 {(() => {
-                  const rawPhone = product.sellerPhone || "";
+                  const effectivePhone =
+                    (user && (user.id === product.sellerId || (product.sellerName && user.fullName === product.sellerName)) && user.phone)
+                      ? user.phone
+                      : (product.sellerPhone || "");
+                  const rawPhone = effectivePhone;
                   let cleanDigits = rawPhone.replace(/[^0-9]/g, "");
                   if (cleanDigits.startsWith("0") && cleanDigits.length === 10) {
                     cleanDigits = "254" + cleanDigits.slice(1);
@@ -493,7 +538,7 @@ export default function ProductDetailPage() {
                           className="w-full py-4 rounded-2xl bg-[#25D366] hover:bg-[#20ba59] text-white font-extrabold text-base flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
                         >
                           <MessageCircle className="w-5 h-5" />
-                          <span>Chat on WhatsApp ({product.sellerPhone})</span>
+                          <span>Chat on WhatsApp ({effectivePhone})</span>
                         </a>
                       ) : (
                         <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-center text-xs font-semibold">
@@ -501,9 +546,9 @@ export default function ProductDetailPage() {
                         </div>
                       )}
 
-                      {product.sellerPhone && (
+                      {effectivePhone && (
                         <a
-                          href={`tel:${product.sellerPhone.replace(/\s+/g, "")}`}
+                          href={`tel:${effectivePhone.replace(/\s+/g, "")}`}
                           className="w-full py-3.5 rounded-2xl border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
                         >
                           <Phone className="w-4 h-4 text-emerald-600" />

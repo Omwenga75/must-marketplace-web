@@ -42,6 +42,7 @@ export default function ProfilePage() {
   );
   const [location, setLocation] = useState(user?.location || "Main Gate");
   const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
 
   React.useEffect(() => {
     if (user) {
@@ -121,12 +122,19 @@ export default function ProfilePage() {
       : null;
 
     try {
+      const phoneChanged = fullPhone && fullPhone !== user.phone;
       await updateUserProfile({
         fullName: fullName.trim() || user.fullName,
         phone: fullPhone,
         location: location || "Main Gate",
       });
       setIsEditing(false);
+      if (phoneChanged) {
+        setSavedMsg("✓ Profile saved — WhatsApp/Call number updated on all your listings.");
+      } else {
+        setSavedMsg("✓ Profile saved.");
+      }
+      setTimeout(() => setSavedMsg(""), 4000);
     } catch (err) {
       console.warn("Failed to update profile:", err);
     } finally {
@@ -203,6 +211,14 @@ export default function ProfilePage() {
             <span>{isEditing ? "Cancel" : "Edit Profile"}</span>
           </button>
         </div>
+
+        {/* Success toast notification */}
+        {savedMsg && (
+          <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 animate-fade-in">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{savedMsg}</span>
+          </div>
+        )}
 
         {/* Edit Form */}
         {isEditing && (

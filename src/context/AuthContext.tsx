@@ -490,9 +490,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // 3. If phone changed, propagate new sellerPhone to ALL this user's product listings
+    // 3. Propagate updated phone to ALL this user's product listings
     if (updates.phone && user.id) {
-      updateSellerPhoneOnProducts(user.id, user.email, updates.phone).catch(() => {});
+      updateSellerPhoneOnProducts(
+        user.id,
+        user.email,
+        updates.fullName || user.fullName,
+        updates.phone,
+        user.phone
+      ).catch(() => {});
     }
   };
 
