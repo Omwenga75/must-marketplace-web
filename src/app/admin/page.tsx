@@ -571,7 +571,7 @@ export default function AdminPage() {
           PRODUCTS / LISTINGS TAB
       ══════════════════════════════════════════════ */}
       {activeTab === "products" && (
-        <div className={!loadingData && filteredProducts.length === 0 && productSearch.trim().length === 0 && productStatusFilter === "all" ? "flex flex-col flex-1 min-h-[calc(100dvh-14rem)]" : "space-y-4"}>
+        <div className={!loadingData && filteredProducts.length === 0 && productSearch.trim().length === 0 && productStatusFilter === "all" ? "flex flex-col min-h-[32rem]" : "space-y-4"}>
           {/* Controls: Search and Status Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search */}
@@ -683,8 +683,9 @@ export default function AdminPage() {
             ) : (
               <EmptyState
                 variant="default"
-                fullPage={true}
+                fullPage={false}
                 colorScheme="emerald"
+                className="flex-1"
                 title="No Campus Listings Yet"
                 description="No products or services have been listed for sale on MUST Marketplace yet. When student sellers create listings, they will appear here in real-time."
               />
@@ -772,7 +773,7 @@ export default function AdminPage() {
           USERS TAB
       ══════════════════════════════════════════════ */}
       {activeTab === "users" && (
-        <div className={!loadingData && filteredUsers.length === 0 && userSearch.trim().length === 0 && userRoleFilter === "all" ? "flex flex-col flex-1 min-h-[calc(100dvh-14rem)]" : "space-y-4"}>
+        <div className={!loadingData && filteredUsers.length === 0 && userSearch.trim().length === 0 && userRoleFilter === "all" ? "flex flex-col min-h-[32rem]" : "space-y-4"}>
           {/* Controls: Search and Role Filters */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search */}
@@ -884,8 +885,9 @@ export default function AdminPage() {
             ) : (
               <EmptyState
                 variant="default"
-                fullPage={true}
+                fullPage={false}
                 colorScheme="indigo"
+                className="flex-1"
                 title="No Registered Users Yet"
                 description="No student or campus accounts have registered yet. As students sign in, list items, and engage, their accounts and activity will show up here."
               />
