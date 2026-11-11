@@ -18,7 +18,7 @@ import {
   Store,
 } from "lucide-react";
 import { Product } from "@/types";
-import { getProductById, recordProductView, getProductLikes } from "@/lib/firebase/services";
+import { getProductById, recordProductView, getProductLikes, getLocalStoredProducts } from "@/lib/firebase/services";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -124,10 +124,20 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!productId) return;
 
+    // 0. Instantly load from local cache if present (0ms on open!)
+    const cached = getLocalStoredProducts().find((p) => p.id === productId);
+    if (cached) {
+      setProduct(cached);
+      document.title = `${cached.title} | Ksh ${cached.price}`;
+      setLoading(false);
+    }
+
     getProductById(productId)
       .then((data) => {
-        setProduct(data);
-        document.title = `${data.title} | Ksh ${data.price}`;
+        if (data) {
+          setProduct(data);
+          document.title = `${data.title} | Ksh ${data.price}`;
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -256,6 +266,8 @@ export default function ProductDetailPage() {
             <img
               src={activeImage}
               alt={product.title}
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover object-center transition-all duration-700 ease-in-out"
             />
 

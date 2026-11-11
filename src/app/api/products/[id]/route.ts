@@ -118,7 +118,16 @@ export async function GET(
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  // 1. Try Firebase RTDB
+  // 1. Check local file cache first (5ms instant response!)
+  const products = readAllProducts();
+  const localProduct = products.find((p) => p.id === id && !deleted.has(p.id));
+  if (localProduct) {
+    return NextResponse.json(localProduct, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
+  }
+
+  // 2. Fallback to live Firebase RTDB
   try {
     const fbProduct = await getFirebaseProductById(id);
     if (fbProduct && !deleted.has(fbProduct.id)) {
@@ -128,17 +137,7 @@ export async function GET(
     }
   } catch {}
 
-  // 2. Fallback to local cache
-  const products = readAllProducts();
-  const product = products.find((p) => p.id === id && !deleted.has(p.id));
-
-  if (!product) {
-    return NextResponse.json({ error: "Product not found" }, { status: 404 });
-  }
-
-  return NextResponse.json(product, {
-    headers: { "Cache-Control": "no-store, max-age=0" },
-  });
+  return NextResponse.json({ error: "Product not found" }, { status: 404 });
 }
 
 export async function PATCH(

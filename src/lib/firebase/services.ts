@@ -378,10 +378,23 @@ export async function fetchProducts(): Promise<Product[]> {
 export async function getProductById(id: string): Promise<Product | null> {
   if (!id || getDeletedProductIds().has(id)) return null;
 
-  // 1. Try server API
+  // 1. Instant local cache lookup (0ms latency!)
+  const localList = getLocalStoredProducts();
+  const cached = localList.find((p) => p.id === id);
+  if (cached) {
+    // Revalidate in background without blocking caller
+    if (typeof window !== "undefined") {
+      fetch(`/api/products/${id}`).catch(() => {});
+    }
+    return cached;
+  }
+
+  // 2. Try server API with fast 3s timeout
   if (typeof window !== "undefined") {
     try {
-      const res = await fetch(`/api/products/${id}`);
+      const res = await fetch(`/api/products/${id}`, {
+        signal: AbortSignal.timeout(3000),
+      });
       if (res.ok) {
         const item: Product = await res.json();
         return {
@@ -392,7 +405,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     } catch {}
   }
 
-  // 2. Try Firebase RTDB
+  // 3. Try Firebase RTDB
   if (database) {
     try {
       const prodRef = ref(database, `products/${id}`);
@@ -423,9 +436,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     }
   }
 
-  // 3. Fallback to local
-  const localList = getLocalStoredProducts();
-  return localList.find((p) => p.id === id) || null;
+  return null;
 }
 
 export async function recordProductView(productId: string, userId?: string) {
