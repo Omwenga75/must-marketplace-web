@@ -247,6 +247,9 @@ function setLocalStoredProducts(products: Product[]) {
 export async function fetchProducts(): Promise<Product[]> {
   const deleted = getDeletedProductIds();
   const productsMap = new Map<string, Product>();
+  // Track whether a remote source was successfully reached (even if empty)
+  // so we don't fall back to stale localStorage when the server says "no products"
+  let remoteContactedSuccessfully = false;
 
   // Helper to add or merge product if NOT deleted
   const addProd = (item: any, idKey?: string) => {
@@ -286,6 +289,7 @@ export async function fetchProducts(): Promise<Product[]> {
     try {
       const res = await fetch("/api/products", { cache: "no-store" });
       if (res.ok) {
+        remoteContactedSuccessfully = true;
         const deletedHeader = res.headers.get("x-deleted-products");
         if (deletedHeader) {
           try {
@@ -339,14 +343,19 @@ export async function fetchProducts(): Promise<Product[]> {
             if (!deleted.has(key)) addProd(val[key], key);
           });
         }
+      } else if (snapshot !== null) {
+        // Firebase responded but has no products — mark as successfully contacted
+        // so we don't resurrect stale localStorage entries
+        remoteContactedSuccessfully = true;
       }
     } catch (error) {
       console.warn("Firebase fetch error for products:", error);
     }
   }
 
-  // 3. Fallback to local cache if both remote sources returned nothing
-  if (productsMap.size === 0) {
+  // 3. Fallback to local cache ONLY if both remote sources failed (network error),
+  //    NOT if they successfully returned empty — that would resurrect deleted items
+  if (productsMap.size === 0 && !remoteContactedSuccessfully) {
     const cachedList = getLocalStoredProducts();
     cachedList.forEach((p) => {
       if (!deleted.has(p.id)) addProd(p);
