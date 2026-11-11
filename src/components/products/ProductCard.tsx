@@ -141,7 +141,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     } catch {}
   };
 
-  const handlePrefetch = () => {
+  const handleMouseEnterPrefetch = () => {
     try {
       router.prefetch(`/product/${product.id}`);
       saveForHandoff();
@@ -155,10 +155,8 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Link
           href={`/product/${product.id}`}
           className="block w-full h-full"
-          prefetch={true}
           onClick={saveForHandoff}
-          onMouseEnter={handlePrefetch}
-          onTouchStart={handlePrefetch}
+          onMouseEnter={handleMouseEnterPrefetch}
         >
           <img
             src={imgSrc}
@@ -257,10 +255,8 @@ export default function ProductCard({ product }: ProductCardProps) {
         <Link
           href={`/product/${product.id}`}
           title={product.title}
-          prefetch={true}
           onClick={saveForHandoff}
-          onMouseEnter={handlePrefetch}
-          onTouchStart={handlePrefetch}
+          onMouseEnter={handleMouseEnterPrefetch}
           className="group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors block mt-0.5"
         >
           <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 min-w-0">

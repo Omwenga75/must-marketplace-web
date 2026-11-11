@@ -790,6 +790,94 @@ export async function updateProduct(productId: string, updates: Partial<Product>
   await Promise.allSettled(networkTasks);
 }
 
+/**
+ * When a seller updates their phone number, propagate the new sellerPhone
+ * to ALL their product listings (localStorage + server API + Firebase RTDB).
+ * sellerId can be the user's id or email (used to match products).
+ */
+export async function updateSellerPhoneOnProducts(
+  sellerId: string,
+  sellerEmail: string | null | undefined,
+  newPhone: string
+): Promise<void> {
+  if (!sellerId || !newPhone) return;
+
+  // 1. Update local cache
+  const local = getLocalStoredProducts();
+  const toUpdate: string[] = [];
+  const updated = local.map((p) => {
+    const owned =
+      p.sellerId === sellerId ||
+      (sellerEmail && p.sellerId?.toLowerCase() === sellerEmail.toLowerCase()) ||
+      (sellerEmail && p.sellerPhone && false); // identity match only
+    if (owned) {
+      toUpdate.push(p.id);
+      return { ...p, sellerPhone: newPhone };
+    }
+    return p;
+  });
+  if (toUpdate.length > 0) setLocalStoredProducts(updated);
+
+  // 2. Update each product in Firebase RTDB + server API in parallel
+  if (toUpdate.length > 0) {
+    await Promise.allSettled(
+      toUpdate.map((productId) => {
+        const tasks: Promise<any>[] = [];
+        if (typeof window !== "undefined") {
+          tasks.push(
+            fetch(`/api/products/${productId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sellerPhone: newPhone }),
+            }).catch(() => {})
+          );
+        }
+        if (database) {
+          tasks.push(
+            update(ref(database, `products/${productId}`), { sellerPhone: newPhone }).catch(() => {})
+          );
+        }
+        return Promise.allSettled(tasks);
+      })
+    );
+  }
+
+  // 3. Also do a bulk Firebase RTDB query to catch any products not in local cache
+  if (database && sellerId) {
+    try {
+      const snap = await get(ref(database, "products"));
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === "object") {
+          const firebaseTasks: Promise<any>[] = [];
+          Object.entries(val).forEach(([k, v]: [string, any]) => {
+            if (!v) return;
+            if (toUpdate.includes(k)) return; // already handled
+            if (
+              v.sellerId === sellerId ||
+              (sellerEmail && v.sellerId?.toLowerCase() === sellerEmail.toLowerCase())
+            ) {
+              firebaseTasks.push(
+                update(ref(database, `products/${k}`), { sellerPhone: newPhone }).catch(() => {})
+              );
+              if (typeof window !== "undefined") {
+                firebaseTasks.push(
+                  fetch(`/api/products/${k}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ sellerPhone: newPhone }),
+                  }).catch(() => {})
+                );
+              }
+            }
+          });
+          if (firebaseTasks.length > 0) await Promise.allSettled(firebaseTasks);
+        }
+      }
+    } catch {}
+  }
+}
+
 export async function deleteProduct(productId: string, sellerId?: string): Promise<void> {
   if (!productId) return;
 

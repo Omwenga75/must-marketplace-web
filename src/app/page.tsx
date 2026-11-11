@@ -309,7 +309,6 @@ export default function HomePage() {
                       <Link
                         key={item.id}
                         href={`/product/${item.id}`}
-                        prefetch={true}
                         onClick={() => {
                           try { sessionStorage.setItem(`must_item_${item.id}`, JSON.stringify(item)); } catch {}
                         }}

@@ -12,7 +12,7 @@ import {
 } from "firebase/auth";
 import { ref, get, set, update } from "firebase/database";
 import { auth, database } from "@/lib/firebase/config";
-import { createNotification } from "@/lib/firebase/services";
+import { createNotification, updateSellerPhoneOnProducts } from "@/lib/firebase/services";
 import { User } from "@/types";
 import { isAdministratorEmail } from "@/lib/utils";
 
@@ -488,6 +488,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn("Error updating user in DB:", err);
       }
+    }
+
+    // 3. If phone changed, propagate new sellerPhone to ALL this user's product listings
+    if (updates.phone && user.id) {
+      updateSellerPhoneOnProducts(user.id, user.email, updates.phone).catch(() => {});
     }
   };
 
