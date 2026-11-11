@@ -192,7 +192,7 @@ export async function DELETE(
 
     // 3. Remove from products.json cache
     const stored = readAllProducts();
-    const sourceProducts = stored.length > 0 ? stored : INITIAL_SAMPLE_PRODUCTS;
+    const sourceProducts = stored;
     const deletedProd = sourceProducts.find((p) => p.id === id);
     const filtered = sourceProducts.filter((p) => !deletedSet.has(p.id) && p.id !== id);
     saveProducts(filtered);

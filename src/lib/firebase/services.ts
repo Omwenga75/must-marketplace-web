@@ -206,14 +206,20 @@ export function updateProductLikes(productId: string, delta: number): number {
 
 export function getLocalStoredProducts(): Product[] {
   const deleted = getDeletedProductIds();
-  if (typeof window === "undefined") return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
+  if (typeof window === "undefined") return [];
   try {
     const cached = localStorage.getItem(LOCAL_STORAGE_PRODUCTS_KEY);
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed
-          .filter((item) => !deleted.has(item.id))
+          .filter(
+            (item) =>
+              item &&
+              item.id &&
+              !deleted.has(item.id) &&
+              !item.id.startsWith("prod-")
+          )
           .map((item) => ({
             ...item,
             likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
@@ -223,18 +229,16 @@ export function getLocalStoredProducts(): Product[] {
   } catch (e) {
     console.error("Failed to read local products cache:", e);
   }
-  return INITIAL_SAMPLE_PRODUCTS
-    .filter((p) => !deleted.has(p.id))
-    .map((item) => ({
-      ...item,
-      likes: typeof item.likes === "number" ? item.likes : (Number(item.likes) || 0),
-    }));
+  return [];
 }
 
 function setLocalStoredProducts(products: Product[]) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_PRODUCTS_KEY, JSON.stringify(products));
+    const clean = products.filter(
+      (item) => item && item.id && !item.id.startsWith("prod-")
+    );
+    localStorage.setItem(LOCAL_STORAGE_PRODUCTS_KEY, JSON.stringify(clean));
   } catch (e) {
     console.error("Failed to update local products cache:", e);
   }

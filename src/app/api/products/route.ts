@@ -129,10 +129,7 @@ function saveProductsFile(products: Product[]): void {
 
 function getOrInitProducts(deleted: Set<string>): Product[] {
   const stored = readProductsFile();
-  if (stored.length > 0) return stored.filter((p) => !deleted.has(p.id));
-  const initial = INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
-  saveProductsFile(initial);
-  return initial;
+  return stored.filter((p) => !deleted.has(p.id) && !p.id.startsWith("prod-"));
 }
 
 // ── Route handlers ───────────────────────────────────────────────────────────
