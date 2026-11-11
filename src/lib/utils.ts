@@ -5,12 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatPrice(amount: number): string {
-  return new Intl.NumberFormat("en-KE", {
+export function formatPrice(amount: number, conditionOrIsBusiness?: string | boolean): string {
+  const isBusiness =
+    typeof conditionOrIsBusiness === "boolean"
+      ? conditionOrIsBusiness
+      : conditionOrIsBusiness === "BUSINESS";
+
+  const formatted = new Intl.NumberFormat("en-KE", {
     style: "currency",
     currency: "KES",
     maximumFractionDigits: 0,
   }).format(amount).replace("KES", "KSh");
+
+  return isBusiness ? `From ${formatted}` : formatted;
 }
 
 /** Format a date as DD/MM/YYYY */

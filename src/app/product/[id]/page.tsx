@@ -351,7 +351,7 @@ export default function ProductDetailPage() {
               </h1>
               <span className="text-xl sm:text-2xl font-bold text-slate-300 dark:text-slate-600">|</span>
               <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {formatPrice(product.price)}
+                {formatPrice(product.price, product.condition)}
               </span>
             </div>
 

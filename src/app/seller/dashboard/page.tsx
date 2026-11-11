@@ -490,7 +490,7 @@ export default function SellerDashboardPage() {
                       </span>
                     </div>
                     <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                      {formatPrice(prod.price)}
+                      {formatPrice(prod.price, prod.condition)}
                     </p>
                     <p className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
                       <span>{prod.location}</span>
@@ -600,16 +600,21 @@ export default function SellerDashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Price (KSh)
+                    {editForm.condition === "BUSINESS" ? "Price (From KSh)" : "Price (KSh)"}
                   </label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    value={editForm.price}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-400 pointer-events-none">
+                      {editForm.condition === "BUSINESS" ? "From KSh" : "KSh"}
+                    </span>
+                    <input
+                      type="number"
+                      required
+                      min={0}
+                      value={editForm.price}
+                      onChange={(e) => setEditForm((prev) => ({ ...prev, price: Number(e.target.value) }))}
+                      className={`w-full ${editForm.condition === "BUSINESS" ? "pl-20" : "pl-12"} pr-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-hidden focus:border-emerald-500 font-bold`}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

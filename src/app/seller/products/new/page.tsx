@@ -423,11 +423,11 @@ export default function NewProductPage() {
               {/* Price Input */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Price (KSh) *
+                  {condition === "BUSINESS" ? "Price (From KSh) *" : "Price (KSh) *"}
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-400">
-                    KSh
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-extrabold text-slate-400 pointer-events-none">
+                    {condition === "BUSINESS" ? "From KSh" : "KSh"}
                   </span>
                   <input
                     type="number"
@@ -435,7 +435,7 @@ export default function NewProductPage() {
                     placeholder="2500"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    className="w-full pl-12 pr-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold transition-all"
+                    className={`w-full ${condition === "BUSINESS" ? "pl-20" : "pl-12"} pr-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold transition-all`}
                   />
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function NewProductPage() {
                   onClick={() => setPrice(String(amt))}
                   className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 text-[10px] font-bold shrink-0 transition-colors"
                 >
-                  KSh {amt.toLocaleString()}
+                  {condition === "BUSINESS" ? `From KSh ${amt.toLocaleString()}` : `KSh ${amt.toLocaleString()}`}
                 </button>
               ))}
             </div>
@@ -606,7 +606,7 @@ export default function NewProductPage() {
                   </h4>
                   <span className="text-slate-400 dark:text-slate-600 font-normal shrink-0">|</span>
                   <span className="text-sm font-black text-slate-900 dark:text-white shrink-0">
-                    {formatPrice(numericPrice || 0)}
+                    {formatPrice(numericPrice || 0, condition)}
                   </span>
                 </div>
 

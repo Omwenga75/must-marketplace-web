@@ -242,7 +242,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <span className="truncate">{displayTitle}</span>
             <span className="text-slate-300 dark:text-slate-600 font-normal shrink-0">|</span>
             <span className="font-black text-slate-900 dark:text-white shrink-0">
-              {formatPrice(product.price)}
+              {formatPrice(product.price, product.condition)}
             </span>
           </h3>
         </Link>

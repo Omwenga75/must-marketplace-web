@@ -729,7 +729,7 @@ export default function AdminPage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5 truncate">
-                      by {p.sellerName} · {formatPrice(p.price)} ·{" "}
+                      by {p.sellerName} · {formatPrice(p.price, p.condition)} ·{" "}
                       {p.createdAt ? formatRelativeTime(toTimestamp(p.createdAt)) : "—"}
                     </p>
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
