@@ -66,9 +66,13 @@ export default function HomePage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setUserCount(data.length);
+        } else {
+          setUserCount(0);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setUserCount(0);
+      });
 
     // Real-time Firebase listener so homepage updates LIVE when items are liked or viewed
     let unsubDb: (() => void) | null = null;
@@ -239,10 +243,10 @@ export default function HomePage() {
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
-                    {userCount !== null && userCount > 50 ? `${userCount}+` : "50+"}
+                    {userCount === null ? "..." : userCount}
                   </p>
                   <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    Registered Users
+                    {userCount === 1 ? "Registered User" : "Registered Users"}
                   </p>
                 </div>
                 <div className="space-y-0.5">

@@ -626,7 +626,7 @@ export default function NewProductPage() {
                       {user.fullName}
                     </span>
                   </div>
-                  <span className="text-emerald-600 font-semibold">Verified Student</span>
+                  <span className="text-emerald-600 font-semibold">Verified Seller</span>
                 </div>
               </div>
             </div>
