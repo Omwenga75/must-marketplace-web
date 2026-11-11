@@ -316,8 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserProfile(fUser.uid, fUser.email || "");
       } else {
         const demo = localStorage.getItem("must_demo_session");
-        const isExplicitLogout = sessionStorage.getItem("must_explicit_logout") === "true";
-        if (isExplicitLogout && !demo) {
+        if (!demo) {
           localStorage.removeItem("must_active_user");
           localStorage.removeItem("must_active_uid");
           setUser(null);
