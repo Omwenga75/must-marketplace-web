@@ -307,9 +307,27 @@ export async function saveFirebaseProduct(product: Product): Promise<boolean> {
   return res.ok;
 }
 
+/** Fast partial update of product in Firebase RTDB using native PATCH */
+export async function patchFirebaseProduct(id: string, updates: Partial<Product>): Promise<boolean> {
+  if (!id) return false;
+  const res = await rtdbRequest(`products/${encodeURIComponent(id)}.json`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return res.ok;
+}
+
+/** In-memory cache for deleted product IDs to prevent redundant RTDB calls */
+let cachedDeletedProductIds: Set<string> | null = null;
+let cachedDeletedProductIdsExpiry = 0;
+
 /** Permanently delete a product from Firebase RTDB and record tombstone */
 export async function deleteFirebaseProduct(id: string): Promise<boolean> {
   if (!id) return false;
+
+  if (cachedDeletedProductIds) {
+    cachedDeletedProductIds.add(id);
+  }
 
   // 1. Remove node from /products/{id}
   const delRes = await rtdbRequest(`products/${encodeURIComponent(id)}.json`, {
@@ -327,11 +345,17 @@ export async function deleteFirebaseProduct(id: string): Promise<boolean> {
 
 /** Get all deleted product IDs (tombstones) from Firebase RTDB */
 export async function getFirebaseDeletedProductIds(): Promise<Set<string>> {
+  const now = Date.now();
+  if (cachedDeletedProductIds && now < cachedDeletedProductIdsExpiry) {
+    return cachedDeletedProductIds;
+  }
   const res = await rtdbRequest("deleted_products.json?shallow=true");
   if (!res.ok || !res.data || typeof res.data !== "object") {
-    return new Set();
+    return cachedDeletedProductIds || new Set();
   }
-  return new Set(Object.keys(res.data));
+  cachedDeletedProductIds = new Set(Object.keys(res.data));
+  cachedDeletedProductIdsExpiry = now + 15000; // 15 second TTL
+  return cachedDeletedProductIds;
 }
 
 /** Save tombstone for deleted product */

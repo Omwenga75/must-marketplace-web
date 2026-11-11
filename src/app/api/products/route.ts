@@ -140,7 +140,15 @@ function getOrInitProducts(deleted: Set<string>): Product[] {
 // GET /api/products — Returns all active products from Firebase with deleted-IDs header
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const deletedSet = await getAllDeletedIds();
+
+  // Fast-path: Run deleted IDs and live products fetch in PARALLEL
+  const [deletedSet, fbRes] = await Promise.all([
+    getAllDeletedIds(),
+    getFirebaseProductsDetailed().catch((err) => {
+      console.warn("Firebase products fetch warning:", err);
+      return { ok: false, products: [] as Product[] };
+    }),
+  ]);
   const deletedList = Array.from(deletedSet);
 
   // ?deleted=1  →  return only the deleted IDs array
@@ -153,16 +161,11 @@ export async function GET(req: Request) {
   let products: Product[] = [];
   let fbReachable = false;
 
-  // 1. Primary: Fetch live products from Firebase Realtime Database
-  try {
-    const fbRes = await getFirebaseProductsDetailed();
-    if (fbRes.ok) {
-      fbReachable = true;
-      products = fbRes.products.filter((p) => !deletedSet.has(p.id));
-      saveProductsFile(products);
-    }
-  } catch (err) {
-    console.warn("Firebase products fetch warning:", err);
+  // 1. Primary: If live products from Firebase Realtime Database succeeded
+  if (fbRes.ok && fbRes.products) {
+    fbReachable = true;
+    products = fbRes.products.filter((p) => !deletedSet.has(p.id));
+    saveProductsFile(products);
   }
 
   // 2. Fallback to local cache ONLY if Firebase RTDB was unreachable (e.g. offline dev / network down).
@@ -187,9 +190,6 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const deletedSet = await getAllDeletedIds();
-    const existing = getOrInitProducts(deletedSet);
-
     const id = body.id || `prod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     removeLocalDeletedId(id);
 
@@ -202,12 +202,17 @@ export async function POST(req: Request) {
       createdAt: body.createdAt || new Date().toISOString(),
     };
 
-    // Save directly to Firebase Realtime Database
-    await saveFirebaseProduct(newProduct);
-
-    // Also update local cache
-    const filtered = existing.filter((p) => p.id !== newProduct.id);
-    saveProductsFile([newProduct, ...filtered]);
+    // Save directly to Firebase Realtime Database & update local cache concurrently
+    await Promise.all([
+      saveFirebaseProduct(newProduct),
+      (async () => {
+        try {
+          const stored = readProductsFile();
+          const filtered = stored.filter((p) => p.id !== newProduct.id);
+          saveProductsFile([newProduct, ...filtered]);
+        } catch {}
+      })(),
+    ]);
 
     return NextResponse.json(newProduct, { status: 201 });
   } catch (err: any) {

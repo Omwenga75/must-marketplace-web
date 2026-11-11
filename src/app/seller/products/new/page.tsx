@@ -199,9 +199,7 @@ export default function NewProductPage() {
       });
 
       if (!user.isSeller) {
-        try {
-          await updateUserProfile({ seller: true, isSeller: true });
-        } catch {}
+        updateUserProfile({ seller: true, isSeller: true }).catch(() => {});
       }
 
       router.push(`/product/${created.id}`);

@@ -253,10 +253,9 @@ export default function SellerDashboardPage() {
     });
   };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
+  const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    setSavingEdit(true);
 
     const matchedCat =
       SAMPLE_CATEGORIES.find((c) => c.id === editForm.categoryId) || editingProduct.category;
@@ -270,31 +269,35 @@ export default function SellerDashboardPage() {
       category: matchedCat,
     };
 
-    try {
-      await updateProduct(editingProduct.id, updates);
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...updates } : p))
-      );
+    const targetId = editingProduct.id;
+    const previousProducts = products;
+    const updatedItem = { ...editingProduct, ...updates };
 
-      // Broadcast across open tabs and windows
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel("must_marketplace_products_sync");
-          bc.postMessage({
-            type: "UPDATE",
-            productId: editingProduct.id,
-            product: { ...editingProduct, ...updates },
-          });
-          bc.close();
-        } catch {}
-      }
+    // Optimistic UI: Close modal & update dashboard view INSTANTLY with 0 delay!
+    setProducts((prev) =>
+      prev.map((p) => (p.id === targetId ? updatedItem : p))
+    );
+    setEditingProduct(null);
 
-      setEditingProduct(null);
-    } catch (err) {
-      alert("Failed to save changes. Please try again.");
-    } finally {
-      setSavingEdit(false);
+    // Broadcast update across open tabs and windows immediately
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        const bc = new BroadcastChannel("must_marketplace_products_sync");
+        bc.postMessage({
+          type: "UPDATE",
+          productId: targetId,
+          product: updatedItem,
+        });
+        bc.close();
+      } catch {}
     }
+
+    // Persist changes in the background without freezing the UI
+    updateProduct(targetId, updates).catch((err) => {
+      console.error("Failed to save changes in background:", err);
+      setProducts(previousProducts);
+      alert("Failed to save changes. Please try again.");
+    });
   };
 
   return (

@@ -312,8 +312,8 @@ export async function fetchProducts(): Promise<Product[]> {
     }
   }
 
-  // 2. Best-effort Firebase RTDB fetch (with fast 500ms timeout race so it NEVER blocks)
-  if (database) {
+  // 2. Best-effort Firebase RTDB fetch (runs ONLY if server API was not reached)
+  if (database && !remoteContactedSuccessfully) {
     try {
       // Sync deleted products tombstone from Firebase
       const delSnapPromise = get(ref(database, "deleted_products"));
@@ -687,42 +687,11 @@ export async function createProduct(
     createdAt: new Date().toISOString(),
   };
 
-  // 1. Post to centralized server API so ALL browsers (Chrome, Edge, guest, incognito) see it immediately!
-  if (typeof window !== "undefined") {
-    try {
-      await fetch("/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newProduct),
-      });
-    } catch (e) {
-      console.warn("Failed to post product to server API:", e);
-    }
-  }
-
-  // 2. Save to Firebase RTDB with that exact unified ID
-  if (database) {
-    try {
-      await set(ref(database, `products/${unifiedId}`), newProduct);
-
-      // Increment seller's active listings count
-      if (newProduct.sellerId) {
-        const sellerRef = ref(database, `users/${newProduct.sellerId}/activeListings`);
-        const snap = await get(sellerRef);
-        const count = (snap.val() as number) || 0;
-        await set(sellerRef, count + 1);
-      }
-    } catch (err) {
-      console.warn("Firebase createProduct fallback:", err);
-    }
-  }
-
-  // 3. Update local cache
+  // 1. Update local cache and broadcast immediately for zero-lag UI response
   const local = getLocalStoredProducts().filter((p) => p.id !== newProduct.id);
   const updated = [newProduct, ...local];
   setLocalStoredProducts(updated);
 
-  // Broadcast addition across open tabs
   if (typeof window !== "undefined") {
     try {
       window.dispatchEvent(new CustomEvent("must_product_created", { detail: { product: newProduct } }));
@@ -734,37 +703,76 @@ export async function createProduct(
     } catch {}
   }
 
+  // 2. Parallel persistence: server API and Firebase RTDB run concurrently
+  const networkTasks: Promise<any>[] = [];
+
+  if (typeof window !== "undefined") {
+    networkTasks.push(
+      fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProduct),
+      }).catch((e) => {
+        console.warn("Failed to post product to server API:", e);
+      })
+    );
+  }
+
+  if (database) {
+    networkTasks.push(
+      set(ref(database, `products/${unifiedId}`), newProduct)
+        .then(() => {
+          if (newProduct.sellerId) {
+            const sellerRef = ref(database, `users/${newProduct.sellerId}/activeListings`);
+            get(sellerRef)
+              .then((snap) => {
+                const count = (snap.val() as number) || 0;
+                set(sellerRef, count + 1).catch(() => {});
+              })
+              .catch(() => {});
+          }
+        })
+        .catch((err) => {
+          console.warn("Firebase createProduct fallback:", err);
+        })
+    );
+  }
+
+  await Promise.allSettled(networkTasks);
   return newProduct;
 }
 
 export async function updateProduct(productId: string, updates: Partial<Product>): Promise<void> {
-  // 1. Update centralized server API
-  if (typeof window !== "undefined") {
-    try {
-      await fetch(`/api/products/${productId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      });
-    } catch {}
-  }
-
-  // 2. Try Firebase RTDB
-  if (database) {
-    try {
-      await update(ref(database, `products/${productId}`), updates);
-    } catch (err) {
-      console.warn("Firebase updateProduct error:", err);
-    }
-  }
-
-  // 3. Update local cache
+  // 1. Update local cache immediately
   const local = getLocalStoredProducts();
   const index = local.findIndex((p) => p.id === productId);
   if (index !== -1) {
     local[index] = { ...local[index], ...updates };
     setLocalStoredProducts(local);
   }
+
+  // 2. Parallel persistence: server API and Firebase RTDB run concurrently
+  const networkTasks: Promise<any>[] = [];
+
+  if (typeof window !== "undefined") {
+    networkTasks.push(
+      fetch(`/api/products/${productId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      }).catch(() => {})
+    );
+  }
+
+  if (database) {
+    networkTasks.push(
+      update(ref(database, `products/${productId}`), updates).catch((err) => {
+        console.warn("Firebase updateProduct error:", err);
+      })
+    );
+  }
+
+  await Promise.allSettled(networkTasks);
 }
 
 export async function deleteProduct(productId: string, sellerId?: string): Promise<void> {

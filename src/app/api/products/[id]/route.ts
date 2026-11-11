@@ -7,6 +7,7 @@ import { INITIAL_SAMPLE_PRODUCTS } from "@/lib/constants";
 import {
   getFirebaseProductById,
   saveFirebaseProduct,
+  patchFirebaseProduct,
   deleteFirebaseProduct,
   getFirebaseDeletedProductIds,
   saveFirebaseDeletedProduct,
@@ -148,26 +149,21 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json();
 
-    // 1. Update in Firebase RTDB
-    let current = await getFirebaseProductById(id);
-    if (!current) {
-      const localList = readAllProducts();
-      current = localList.find((p) => p.id === id) || null;
-    }
-
-    if (!current) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
-    const updated: Product = { ...current, ...body, id };
-    await saveFirebaseProduct(updated);
+    // 1. Direct fast atomic PATCH to Firebase RTDB in background/parallel
+    patchFirebaseProduct(id, body).catch((e) => {
+      console.warn("Fast patch to Firebase RTDB warning:", e);
+    });
 
     // 2. Update in local cache
     const products = readAllProducts();
     const index = products.findIndex((p) => p.id === id);
+    let updated: Product;
     if (index !== -1) {
+      updated = { ...products[index], ...body, id };
       products[index] = updated;
       saveProducts(products);
+    } else {
+      updated = { ...body, id } as Product;
     }
 
     return NextResponse.json(updated);
