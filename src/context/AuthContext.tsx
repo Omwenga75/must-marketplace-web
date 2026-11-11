@@ -83,6 +83,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const savedName = emailLower ? localStorage.getItem(`must_name_for_${emailLower}`) : null;
     const authDisplayName = auth?.currentUser?.displayName;
 
+    // 0. Check if user account was deleted
+    if (database && uid && !uid.startsWith("demo_")) {
+      try {
+        const delSnap = await get(ref(database, `deleted_users/${uid}`));
+        if (delSnap.exists()) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("must_active_user");
+            localStorage.removeItem("must_active_uid");
+            localStorage.removeItem(`must_user_${uid}`);
+            localStorage.removeItem("must_demo_session");
+          }
+          if (auth?.currentUser) {
+            try { await auth.signOut(); } catch {}
+          }
+          setUser(null);
+          setFirebaseUser(null);
+          return;
+        }
+      } catch {}
+    }
+
     // 1. First, check persistent server API (backed by data/users.json)
     if (typeof window !== "undefined") {
       try {
@@ -164,6 +185,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.warn("Could not fetch user profile from Firebase:", err);
       }
+    }
+
+    // If not found in remote sources (Firebase RTDB or /api/users) and not a demo account:
+    // the account was deleted by admin — do NOT resurrect or fallback to local cache!
+    if (!profile && uid && !uid.startsWith("demo_") && database) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("must_active_user");
+        localStorage.removeItem("must_active_uid");
+        localStorage.removeItem(`must_user_${uid}`);
+      }
+      if (auth?.currentUser) {
+        try { await auth.signOut(); } catch {}
+      }
+      setUser(null);
+      setFirebaseUser(null);
+      return;
     }
 
     // 3. Check local cache

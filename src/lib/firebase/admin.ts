@@ -26,13 +26,25 @@ interface ServiceAccount {
   project_id?: string;
 }
 
+// Embedded fallback service account (server-side only, never sent to client)
+const EMBEDDED_SERVICE_ACCOUNT: ServiceAccount = {
+  project_id: "must-marketplace",
+  private_key:
+    "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3qK7ZighMxpTI\n+VygVDcRI7DFZdtOadlZv575U8hx8Ba7C6rPfa3otK1MtTLmPp/l0MZoZucepnGU\noyb84lqxHq2ayesXSgt8rNHPKYgXDQzkkfYmg+FjMBcb8aBXDepswPlUHiqCHyBh\nI1nCthMqBNOBspMdrIFogCuh9MTE0M9mT/SIAWyYO8h69Ycd/ac4DU54ykrpTL6N\n2H/ewJnK4Jzq4Fg8hnf79OQjqdcSZdOSDIT45nZQ0+O4eKmeqdMD2IRtYirmKlBb\nPVtxT8YVJhuSL765N5hGuWNGWdhLmbZe94m8Ezss6ydIy8rxdWyKGmmam0PBmcLJ\nB6LnDq6VAgMBAAECggEAKo1IX6ohxKoQ4GSYH6SLcqrmgsHX9znCjE7/pgxRqYZj\nOdiY7YSUtdEgwuBLp/l0AiLmSVuoKluNfs7zUk2ejiGJvw6P68Ax26PN47XfbFnP\ndijUU3WkU58Zh5Wq3OiiOyrVybXIiwfrsF3optqZI5flKkxl1g75F610joxfx6ql\nvLRKULgipdHQivhMBKeLRHnoQGwB2lpiihVlXDybZ5hVVv5pfBvSdrHWjE+ShjwP\nC3XLeW82qOZmoSEmBb50/uJXXXLMinh21NHKwY9qIDK58Sbk0p92uKMwrP8tRwfR\n6pHx3HVIMOTPgD0YajQkrMaTcBkEoNXIRjBGfzYG8QKBgQDsY+wP72iw2t8O4L24\n+7khreVfcV45yf3qJ31hrLpjA58bsEFF/L720i6kxn0lW1gLKPHivUOVrJuCctNy\nryaJ9FtxgwP2J5wEWJYMf6Rfbk/icAPIKxUKEh4QZHUErOJKJXRaWNpon3IpLpiG\nUHTvJaSbpw64Fmq2GRMTQ+O4cQKBgQDG5O+iGgyqj4AmODqHOj7ByXpEj3y4MdHo\nAPr7PB6XLZBvGoiJ8GqG6GV08gWC2C+LLR/lH6ioo/dgnBv2YuVZar5nngmnyzRk\ncYuaREQUAiWD/wsZmg3Ym/uS8hTfLqHk21U+cd/um7O7rdNGh2zKEjXx/FvfVSR3\n5MV03mqKZQKBgQCX+tovmJWvdtiIQTfZMYXiQGJDDakt8E7ed4sl/B5NQGvQKm6c\n55WDLLiuWarmFKczbZyuUU6dcT7+DIMjrbZSZZdREJHAddDZ/nZiDMKKVGrpw2i7\nDe/V7LYFhgCyA9DtKM14tL2fHDwSfBG18Q5tHr+JD0voUQlEkDRyY2iKEQKBgCrE\nV3K3vzl9mcSeGpexQoVQ2WWcpOjGbahBbbZP+xPuzDvXrLxcYcuYdRhsYhr8eVyn\n20/dOtroRu0TJEAai85qUX7eUJ0v6JgggjAttaXHwGFdmflrUsbc4395ZluHH3Ci\naPYAbnJUMJWOjvt/azkYKVlbNjYTjL/rBTpYCPixAoGBAL/bWDC3LpF2n6MEfATs\nCd15klyF4EDmUiwii+SoerO90FDLPefpx0AGbZvuDVSOiG4LyobkicreJfDR/YOb\nP5fdoV+0aaWXfsRj++bB3Qt1jHcdVd+Plb0FZiPCCrf6srEIx/xRCMvT074vp5OW\npdQNIbQPWcCO45AH5zmfZ6QM\n-----END PRIVATE KEY-----\n",
+  client_email: "firebase-adminsdk-fbsvc@must-marketplace.iam.gserviceaccount.com",
+};
+
 function getServiceAccount(): ServiceAccount | null {
   // 1. Check environment variable (Vercel & .env.local)
   const envRaw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (envRaw) {
     try {
       const clean = envRaw.trim().replace(/^['"]|['"]$/g, "");
-      return JSON.parse(clean);
+      const parsed = JSON.parse(clean);
+      if (typeof parsed.private_key === "string") {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+      }
+      return parsed;
     } catch (e) {
       console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY from env:", e);
     }
@@ -53,7 +65,11 @@ function getServiceAccount(): ServiceAccount | null {
     } catch {}
   }
 
-  return null;
+  // 3. Embedded service account with real newlines as server-side fallback
+  return {
+    ...EMBEDDED_SERVICE_ACCOUNT,
+    private_key: EMBEDDED_SERVICE_ACCOUNT.private_key.replace(/\\n/g, "\n"),
+  };
 }
 
 /** Generate or retrieve a valid Google OAuth access token for Firebase RTDB */

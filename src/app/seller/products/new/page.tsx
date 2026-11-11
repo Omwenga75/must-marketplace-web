@@ -163,6 +163,10 @@ export default function NewProductPage() {
 
   const handlePublish = async () => {
     if (!canPublish) return;
+    if (!user || !user.id) {
+      setError("You must be signed in with an active account to publish a listing.");
+      return;
+    }
     setError("");
     setUploading(true);
 
