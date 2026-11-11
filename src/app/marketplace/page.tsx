@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Product, ProductCondition } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
-import { fetchProducts } from "@/lib/firebase/services";
+import { fetchProducts, getDeletedProductIds } from "@/lib/firebase/services";
 import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import ProductGrid from "@/components/products/ProductGrid";
@@ -59,14 +59,20 @@ function MarketplaceContent() {
         const prodsRef = ref(database, "products");
         unsubDb = onValue(prodsRef, (snapshot) => {
           const val = snapshot.val();
+          const deleted = getDeletedProductIds();
           if (val && typeof val === "object") {
-            const list: Product[] = Object.entries(val).map(([k, v]: [string, any]) => ({
-              ...v,
-              id: v.id || k,
-              likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
-              views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
-            }));
+            const list: Product[] = Object.entries(val)
+              .filter(([k, v]: [string, any]) => !deleted.has(v?.id || k))
+              .map(([k, v]: [string, any]) => ({
+                ...v,
+                id: v.id || k,
+                likes: typeof v.likes === "number" ? v.likes : (Number(v.likes) || 0),
+                views: typeof v.views === "number" ? v.views : (Number(v.views) || 0),
+              }));
             setProducts(list);
+            setLoading(false);
+          } else if (val === null) {
+            setProducts([]);
             setLoading(false);
           }
         });

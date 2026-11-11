@@ -244,11 +244,15 @@ function normalizeUser(raw: any, id: string): User {
 
 // ── Product Operations ───────────────────────────────────────────────────────
 
-/** Fetch all active products directly from Firebase Realtime Database */
-export async function getFirebaseProducts(): Promise<Product[]> {
+/** Fetch all active products directly from Firebase Realtime Database with connection status */
+export async function getFirebaseProductsDetailed(): Promise<{ ok: boolean; products: Product[] }> {
   const res = await rtdbRequest("products.json");
-  if (!res.ok || !res.data || typeof res.data !== "object") {
-    return [];
+  if (!res.ok) {
+    return { ok: false, products: [] };
+  }
+
+  if (!res.data || typeof res.data !== "object") {
+    return { ok: true, products: [] };
   }
 
   const products: Product[] = [];
@@ -258,7 +262,13 @@ export async function getFirebaseProducts(): Promise<Product[]> {
     }
   }
 
-  return products;
+  return { ok: true, products };
+}
+
+/** Fetch all active products directly from Firebase Realtime Database */
+export async function getFirebaseProducts(): Promise<Product[]> {
+  const res = await getFirebaseProductsDetailed();
+  return res.products;
 }
 
 /** Fetch a single product by ID directly from Firebase RTDB */

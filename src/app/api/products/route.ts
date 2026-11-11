@@ -6,6 +6,7 @@ import { Product } from "@/types";
 import { INITIAL_SAMPLE_PRODUCTS } from "@/lib/constants";
 import {
   getFirebaseProducts,
+  getFirebaseProductsDetailed,
   saveFirebaseProduct,
   deleteFirebaseProduct,
   getFirebaseDeletedProductIds,
@@ -150,20 +151,23 @@ export async function GET(req: Request) {
   }
 
   let products: Product[] = [];
+  let fbReachable = false;
 
   // 1. Primary: Fetch live products from Firebase Realtime Database
   try {
-    const fbProducts = await getFirebaseProducts();
-    if (Array.isArray(fbProducts) && fbProducts.length > 0) {
-      products = fbProducts.filter((p) => !deletedSet.has(p.id));
+    const fbRes = await getFirebaseProductsDetailed();
+    if (fbRes.ok) {
+      fbReachable = true;
+      products = fbRes.products.filter((p) => !deletedSet.has(p.id));
       saveProductsFile(products);
     }
   } catch (err) {
     console.warn("Firebase products fetch warning:", err);
   }
 
-  // 2. Fallback to local cache if Firebase returned empty
-  if (products.length === 0) {
+  // 2. Fallback to local cache ONLY if Firebase RTDB was unreachable (e.g. offline dev / network down).
+  // Never fall back if Firebase was successfully contacted and returned 0 products (that means items were deleted).
+  if (!fbReachable && products.length === 0) {
     products = getOrInitProducts(deletedSet);
   }
 
