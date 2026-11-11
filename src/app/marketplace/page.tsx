@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Product, ProductCondition } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS } from "@/lib/constants";
-import { fetchProducts, getDeletedProductIds } from "@/lib/firebase/services";
+import { fetchProducts, getDeletedProductIds, getLocalStoredProducts } from "@/lib/firebase/services";
 import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import ProductGrid from "@/components/products/ProductGrid";
@@ -43,6 +43,13 @@ function MarketplaceContent() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
+    // 0. Instantly populate from local cache if present (0ms on refresh!)
+    const cached = getLocalStoredProducts();
+    if (cached.length > 0) {
+      setProducts(cached);
+      setLoading(false);
+    }
+
     fetchProducts()
       .then((data) => {
         setProducts(data);

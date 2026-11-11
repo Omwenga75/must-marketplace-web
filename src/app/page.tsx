@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Product } from "@/types";
 import { SAMPLE_CATEGORIES, UNIVERSITY_LOCATIONS, CATEGORY_FALLBACK_IMAGES } from "@/lib/constants";
-import { fetchProducts } from "@/lib/firebase/services";
+import { fetchProducts, getLocalStoredProducts } from "@/lib/firebase/services";
 import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import ProductCard from "@/components/products/ProductCard";
@@ -51,6 +51,18 @@ export default function HomePage() {
   const [userCount, setUserCount] = useState<number | null>(null);
 
   useEffect(() => {
+    // 0. Instantly populate from local cache if present (0ms on refresh!)
+    const cached = getLocalStoredProducts();
+    if (cached.length > 0) {
+      setProducts(cached);
+      setLoading(false);
+    }
+
+    try {
+      const cachedCount = sessionStorage.getItem("must_cached_user_count");
+      if (cachedCount) setUserCount(Number(cachedCount));
+    } catch {}
+
     fetchProducts()
       .then((data) => {
         setProducts(data);
@@ -66,12 +78,13 @@ export default function HomePage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setUserCount(data.length);
+          try { sessionStorage.setItem("must_cached_user_count", String(data.length)); } catch {}
         } else {
           setUserCount(0);
         }
       })
       .catch(() => {
-        setUserCount(0);
+        setUserCount((prev) => prev ?? 0);
       });
 
     // Real-time Firebase listener so homepage updates LIVE when items are liked or viewed

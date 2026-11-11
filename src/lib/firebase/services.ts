@@ -204,7 +204,7 @@ export function updateProductLikes(productId: string, delta: number): number {
   return newLikes;
 }
 
-function getLocalStoredProducts(): Product[] {
+export function getLocalStoredProducts(): Product[] {
   const deleted = getDeletedProductIds();
   if (typeof window === "undefined") return INITIAL_SAMPLE_PRODUCTS.filter((p) => !deleted.has(p.id));
   try {

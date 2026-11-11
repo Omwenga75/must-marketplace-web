@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Product } from "@/types";
 import { useAuth } from "@/context/AuthContext";
-import { fetchProducts, updateProduct, deleteProduct } from "@/lib/firebase/services";
+import { fetchProducts, updateProduct, deleteProduct, getLocalStoredProducts } from "@/lib/firebase/services";
 import { database } from "@/lib/firebase/config";
 import { ref, onValue } from "firebase/database";
 import { formatPrice, formatRelativeTime } from "@/lib/utils";
@@ -48,8 +48,37 @@ export default function SellerDashboardPage() {
     categoryId: "1",
   });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [cachedUser, setCachedUser] = useState<any>(null);
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem("must_active_user");
+      if (stored) setCachedUser(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  const activeUser = user || cachedUser;
+
+  useEffect(() => {
+    // 0. Instantly load listings from local cache on mount/refresh (0ms latency!)
+    let effective = user;
+    if (!effective && typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("must_active_user");
+        if (stored) effective = JSON.parse(stored);
+      } catch {}
+    }
+    if (effective) {
+      const cached = getLocalStoredProducts();
+      const myListings = cached.filter(
+        (p) => p.sellerId === effective.id || p.sellerName === effective.fullName || effective.id === "demo_seller_456"
+      );
+      if (myListings.length > 0) {
+        setProducts(myListings);
+        setLoading(false);
+      }
+    }
+
     if (!user) return;
     // 1. Initial fetch from API / cache
     fetchProducts()
@@ -128,7 +157,7 @@ export default function SellerDashboardPage() {
     };
   }, [user]);
 
-  if (!user) {
+  if (!activeUser) {
     if (authLoading) {
       return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-pulse">
@@ -236,7 +265,8 @@ export default function SellerDashboardPage() {
 
   const handleDeleteListing = async (productId: string) => {
     if (confirm("Are you sure you want to permanently delete this listing?")) {
-      await deleteProduct(productId, user.id);
+      const sellerId = user?.id || activeUser?.id;
+      await deleteProduct(productId, sellerId);
       setProducts((prev) => prev.filter((p) => p.id !== productId));
     }
   };
