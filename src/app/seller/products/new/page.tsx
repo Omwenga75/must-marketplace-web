@@ -11,7 +11,6 @@ import {
   AlertCircle,
   MapPin,
   Camera,
-  Sparkles,
   ShoppingBag,
   ShieldCheck,
   Check,
@@ -256,10 +255,9 @@ export default function NewProductPage() {
               <button
                 type="button"
                 onClick={handleAddSuggestedPhotos}
-                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Auto-Fill Samples</span>
+                Auto-Fill Samples
               </button>
             </div>
 
